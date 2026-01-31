@@ -1,0 +1,51 @@
+name: SleepTune
+options:
+  bundleIdPrefix: com.sleep-tune
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "16.0"
+settings:
+  SWIFT_VERSION: "6.2"
+  DEVELOPMENT_TEAM: ""
+  GENERATE_INFOPLIST_FILE: NO
+  INFOPLIST_FILE: SleepTune/App/Info.plist
+  PRODUCT_BUNDLE_IDENTIFIER: com.sleep-tune.app
+  CODE_SIGN_STYLE: Automatic
+  CURRENT_PROJECT_VERSION: 1
+  MARKETING_VERSION: 0.1.0
+packages: {}
+targets:
+  SleepTune:
+    type: application
+    platform: iOS
+    sources:
+      - path: SleepTune
+        excludes:
+          - Tests
+    settings:
+      base:
+        INFOPLIST_FILE: SleepTune/App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SleepTune/App/SleepTune.entitlements
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    dependencies:
+      - sdk: HealthKit.framework
+      - sdk: Charts.framework
+    info:
+      path: SleepTune/App/Info.plist
+      properties:
+        CFBundleDisplayName: sleeptune
+        CFBundleName: sleeptune
+        CFBundleIdentifier: com.sleep-tune.app
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arm64]
+        NSHealthShareUsageDescription: "sleeptune reads your sleep and recovery signals to calculate your sleep score."
+  SleepTuneTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SleepTune/Tests
+    dependencies:
+      - target: SleepTune
+    settings:
+      base:
+        INFOPLIST_FILE: SleepTune/Tests/Info.plist
