@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AppRootView: View {
-    @State private var container = AppContainer()
+    @Environment(AppContainer.self) private var container
 
     var body: some View {
         NavigationStack {
@@ -25,9 +25,5 @@ struct AppRootView: View {
         .task {
             container.scheduleBackgroundSync()
         }
-        .backgroundTask(.appRefresh(AnalyticsConfiguration.backgroundTaskIdentifier)) {
-            await container.handleBackgroundRefresh()
-        }
-        .environment(container)
     }
 }

@@ -21,6 +21,7 @@
 		254D6A3301E39E0F67931245 /* IndicatorSummaryGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956CE103AF22202B92FDB833 /* IndicatorSummaryGridView.swift */; };
 		25C169A238433C9C7A405B5A /* SleepIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B915CE8D651628EEEB852088 /* SleepIndicator.swift */; };
 		26E1C53720EC62AC026B7DF6 /* WeightSliderRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F54546331190A0505DDFD7 /* WeightSliderRowView.swift */; };
+		274BE9892F2938981078E029 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8CD9720D94C51F97181A3785 /* Assets.xcassets */; };
 		27656E0C2DADE503BA9EEF90 /* AnalyticsBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B2505BC45D691B46AD1B16 /* AnalyticsBatch.swift */; };
 		3F8779EB0CBC9B09ED7AF7CC /* ShareReportRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBA37D00E601FCB81BBABE9 /* ShareReportRenderer.swift */; };
 		3FCE0F4A82C18518E1B51BB1 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C484D91CD489C9C531C4B5A0 /* DashboardView.swift */; };
@@ -158,6 +159,7 @@
 		743EDC63B61B3A40FB87B8B0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		821BCEDF78B5BB4D80377BA9 /* SleepScoreComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScoreComponent.swift; sourceTree = "<group>"; };
 		88E31EF5C75073E314704E1E /* AnalyticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsClient.swift; sourceTree = "<group>"; };
+		8CD9720D94C51F97181A3785 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8D17B29CAF3BBEAA1DA43907 /* FileAnalyticsEventStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileAnalyticsEventStore.swift; sourceTree = "<group>"; };
 		8E4A2705CA08B87F338A60D7 /* InsightRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightRowView.swift; sourceTree = "<group>"; };
 		93DEBE8EA25C8EF9BAD7A1CC /* InsightsSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsSectionView.swift; sourceTree = "<group>"; };
@@ -309,6 +311,7 @@
 			children = (
 				263D00C1D4FA9142A01573C2 /* AppContainer.swift */,
 				5E6B7478D7BF362F624E5719 /* AppRootView.swift */,
+				8CD9720D94C51F97181A3785 /* Assets.xcassets */,
 				A44F49BD45CED823FA3662BC /* Info.plist */,
 				33FC2B39B2A9FFFA285DC022 /* SettingsDestination.swift */,
 				CAED741DDAFB7E00B985982F /* SleepTune.entitlements */,
@@ -480,6 +483,7 @@
 			buildConfigurationList = 24444F5434A0119A2EEFB9D9 /* Build configuration list for PBXNativeTarget "SleepTune" */;
 			buildPhases = (
 				F7FCFA9523D22DE52C495BDF /* Sources */,
+				C040EEF70225EF2C49DB2203 /* Resources */,
 				C40EFD4092675D4703F478E4 /* Frameworks */,
 			);
 			buildRules = (
@@ -531,6 +535,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C040EEF70225EF2C49DB2203 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				274BE9892F2938981078E029 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		BF5FE7914555214AC917C7C0 /* Sources */ = {

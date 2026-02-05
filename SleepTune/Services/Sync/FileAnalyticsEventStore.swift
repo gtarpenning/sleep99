@@ -6,15 +6,16 @@ actor FileAnalyticsEventStore: AnalyticsEventStore {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    init(fileURL: URL = Self.defaultFileURL) {
-        self.fileURL = fileURL
+    init(fileURL: URL? = nil) {
+        let resolvedURL = fileURL ?? Self.defaultFileURL
+        self.fileURL = resolvedURL
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         self.encoder = encoder
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
-        self.records = Self.loadRecords(from: fileURL, decoder: decoder)
+        self.records = Self.loadRecords(from: resolvedURL, decoder: decoder)
     }
 
     static var defaultFileURL: URL {
