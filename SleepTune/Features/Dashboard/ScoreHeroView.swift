@@ -1,9 +1,13 @@
 import SwiftUI
+import UIKit
 
 struct ScoreHeroView: View {
     let summary: SleepScoreSummary
     let date: Date
     let bins: [DopplerBin]
+    /// Deviation of last night's avg HR from 30-day personal baseline, in bpm.
+    /// Negative = better than baseline, positive = elevated (worse).
+    let hrDeviation: Double
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
 
@@ -11,14 +15,52 @@ struct ScoreHeroView: View {
     private var scoreColor: Color { DS.scoreColor(for: summary.score) }
     private var isToday: Bool { Calendar.current.isDateInToday(date) }
 
+    /// Maps hrDeviation → ambient glow color.
+    /// -5+ bpm below baseline → deep cool blue
+    ///  0  = neutral           → dim purple
+    /// +5  bpm above baseline  → amber
+    /// +10 bpm above baseline  → hot orange-red
+    private var hrAmbientColor: Color {
+        let stops: [(Double, Color)] = [
+            (-5.0, Color(red: 0.10, green: 0.35, blue: 0.95)), // cool blue (great)
+            ( 0.0, Color(red: 0.30, green: 0.22, blue: 0.65)), // dim purple (baseline)
+            ( 5.0, Color(red: 1.00, green: 0.50, blue: 0.04)), // amber (elevated)
+            (10.0, Color(red: 1.00, green: 0.18, blue: 0.10)), // red-orange (bad)
+        ]
+        let clamped = max(-5, min(10, hrDeviation))
+        for i in 0..<(stops.count - 1) {
+            let (t0, c0) = stops[i]
+            let (t1, c1) = stops[i + 1]
+            if clamped <= t1 {
+                let frac = (clamped - t0) / (t1 - t0)
+                return lerpHeroColor(c0, c1, t: frac)
+            }
+        }
+        return stops.last!.1
+    }
+
+    /// Glow intensity scales with deviation magnitude; subtle at baseline.
+    private var hrGlowOpacity: Double {
+        let magnitude = abs(hrDeviation)
+        return min(0.18 + magnitude * 0.022, 0.45)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             dateNavRow
                 .padding(.bottom, 24)
 
-            // Score number
+            // Score number with ambient HR glow
             scoreLabel
                 .padding(.bottom, 20)
+                .background(
+                    RadialGradient(
+                        colors: [hrAmbientColor.opacity(hrGlowOpacity), .clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 110
+                    )
+                )
 
             // Doppler Stripe — full width hero
             DopplerStripeView(bins: bins, score: summary.score, height: 36)
@@ -89,6 +131,22 @@ struct ScoreHeroView: View {
             ScorePill(label: "Recovery", score: summary.recoveryScore, color: DS.recoveryArc)
         }
     }
+}
+
+// MARK: - HR Ambient Color Lerp
+
+private func lerpHeroColor(_ a: Color, _ b: Color, t: Double) -> Color {
+    let ta = max(0, min(1, t))
+    let ra = 1 - ta
+    var (r0, g0, b0, a0): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+    var (r1, g1, b1, a1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+    UIKit.UIColor(a).getRed(&r0, green: &g0, blue: &b0, alpha: &a0)
+    UIKit.UIColor(b).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+    return Color(
+        red:   Double(r0 * ra + r1 * ta),
+        green: Double(g0 * ra + g1 * ta),
+        blue:  Double(b0 * ra + b1 * ta)
+    )
 }
 
 // MARK: - ScorePill

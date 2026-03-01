@@ -152,8 +152,17 @@ class HealthKitClient {
         var indicators: [SleepIndicator] = []
         indicators.append(contentsOf: buildSleepIndicators(from: sleepSamples))
 
-        let sleepStart    = sleepSamples.map(\.startDate).min()
-        let sleepEnd      = sleepSamples.map(\.endDate).max()
+        // Use the first/last asleep sample (not inBed) as the sleep window for
+        // recovery metrics so Time to Lowest HR is relative to actual sleep, not lying in bed.
+        let asleepValues: Set<Int32> = [
+            Int32(HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue),
+            Int32(HKCategoryValueSleepAnalysis.asleepREM.rawValue),
+            Int32(HKCategoryValueSleepAnalysis.asleepCore.rawValue),
+            Int32(HKCategoryValueSleepAnalysis.asleepDeep.rawValue),
+        ]
+        let asleepOnly = sleepSamples.filter { asleepValues.contains(Int32($0.value)) }
+        let sleepStart    = asleepOnly.map(\.startDate).min() ?? sleepSamples.map(\.startDate).min()
+        let sleepEnd      = asleepOnly.map(\.endDate).max()   ?? sleepSamples.map(\.endDate).max()
         let sleepDuration = (sleepStart != nil && sleepEnd != nil)
             ? sleepEnd!.timeIntervalSince(sleepStart!) : 0
 
@@ -231,8 +240,10 @@ private extension HealthKitClient {
 
     func sleepInterval(for date: Date) -> DateInterval {
         let startOfDay = date.startOfDay
-        let start = calendar.date(byAdding: .hour, value: -12, to: startOfDay) ?? startOfDay
-        let end = calendar.date(byAdding: .hour, value: 12, to: startOfDay) ?? startOfDay.addingTimeInterval(12 * 3600)
+        // Start at 6pm the previous evening to catch early bedtimes.
+        // End at 2pm the following afternoon to catch late risers.
+        let start = calendar.date(byAdding: .hour, value: -18, to: startOfDay) ?? startOfDay
+        let end   = calendar.date(byAdding: .hour, value: 14, to: startOfDay) ?? startOfDay.addingTimeInterval(14 * 3600)
         return DateInterval(start: start, end: end)
     }
 
@@ -367,9 +378,9 @@ private extension HealthKitClient {
         }()
         let hoursInBed = sessionInBed / 3600
         let efficiency = hoursInBed > 0 ? (hoursAsleep / hoursInBed) : 0
-        let remPercent = asleep > 0 ? (rem / asleep) * 100 : 0
-        let deepPercent = asleep > 0 ? (deep / asleep) * 100 : 0
-        let corePercent = asleep > 0 ? (core / asleep) * 100 : 0
+        let remMinutes  = rem  / 60
+        let deepMinutes = deep / 60
+        let coreMinutes = core / 60
 
         var indicators: [SleepIndicator] = [
             SleepIndicator(
@@ -382,17 +393,8 @@ private extension HealthKitClient {
                 range: 4...8  // 8h = perfect score
             ),
             SleepIndicator(
-                name: "Time in Bed",
-                detail: "Total time in bed",
-                value: hoursInBed,
-                unit: "hr",
-                category: .sleepArchitecture,
-                source: .appleHealth,
-                range: 5...10
-            ),
-            SleepIndicator(
                 name: "Sleep Efficiency",
-                detail: "Time asleep vs in bed",
+                detail: "Time asleep vs time in bed",
                 value: efficiency * 100,
                 unit: "%",
                 category: .sleepArchitecture,
@@ -401,30 +403,30 @@ private extension HealthKitClient {
             ),
             SleepIndicator(
                 name: "REM Sleep",
-                detail: "Percent of total sleep",
-                value: remPercent,
-                unit: "%",
+                detail: "Absolute REM minutes",
+                value: remMinutes,
+                unit: "min",
                 category: .sleepArchitecture,
                 source: .appleHealth,
-                range: 15...30
+                range: 30...120
             ),
             SleepIndicator(
                 name: "Deep Sleep",
-                detail: "Percent of total sleep",
-                value: deepPercent,
-                unit: "%",
+                detail: "Absolute deep sleep minutes",
+                value: deepMinutes,
+                unit: "min",
                 category: .sleepArchitecture,
                 source: .appleHealth,
-                range: 10...25
+                range: 10...90
             ),
             SleepIndicator(
                 name: "Core Sleep",
-                detail: "Percent of total sleep",
-                value: corePercent,
-                unit: "%",
+                detail: "Absolute core sleep minutes",
+                value: coreMinutes,
+                unit: "min",
                 category: .sleepArchitecture,
                 source: .appleHealth,
-                range: 40...60
+                range: 60...240
             ),
             SleepIndicator(
                 name: "Awake Time",
@@ -486,6 +488,7 @@ private extension HealthKitClient {
         let hrUnit = HKUnit.count().unitDivided(by: .minute())
 
         async let lowestHRStats = fetchMin(for: .heartRate, predicate: predicate, unit: hrUnit)
+        async let avgHRStats    = fetchAverage(for: .heartRate, predicate: predicate, unit: hrUnit)
         async let hrv       = fetchAverage(for: .heartRateVariabilitySDNN, predicate: predicate, unit: .secondUnit(with: .milli))
         async let respiratory = fetchAverage(for: .respiratoryRate, predicate: predicate, unit: hrUnit)
         async let oxygen    = fetchAverage(for: .oxygenSaturation, predicate: predicate, unit: .percent())
@@ -519,10 +522,22 @@ private extension HealthKitClient {
             ))
         }
 
+        if let value = await avgHRStats {
+            indicators.append(SleepIndicator(
+                name: "Overnight Heart Rate",
+                detail: "Average HR during sleep",
+                value: value,
+                unit: "bpm",
+                category: .recovery,
+                source: .appleWatch,
+                range: 45...75
+            ))
+        }
+
         if let fraction = timeToLowestFraction {
             indicators.append(SleepIndicator(
                 name: "Time to Lowest HR",
-                detail: "How early in sleep HR bottomed out",
+                detail: "First third of night = perfect · later = worse",
                 value: fraction,
                 unit: "fraction",
                 category: .recovery,

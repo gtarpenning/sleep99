@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -66,6 +66,9 @@
 		D88531F1FEAE6DBCD5768F20 /* SignalOverlayChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286056DD7A153ABA9A613BC8 /* SignalOverlayChartView.swift */; };
 		E20F30C0BC78B8430CADF2DC /* SleepScoreEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8E63173E63ED2B36D0DF07 /* SleepScoreEngineTests.swift */; };
 		E2FF77710250CB8B1AE18A7C /* MetricProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C45927DB747AB48BE8B68B4 /* MetricProfiles.swift */; };
+		BB11223344556677889900BB /* MetricDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900AA /* MetricDefinition.swift */; };
+		BB11223344556677889900DD /* MetricStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900CC /* MetricStats.swift */; };
+		BB11223344556677889900FF /* MetricDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900EE /* MetricDetailSheet.swift */; };
 		E3901DADA81D1E9642CC2F4F /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DA7B090374DFCA980C193D8 /* LocalStore.swift */; };
 		E53D51EC1BE4186F129261C3 /* FamilyFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8A6BAAB15BE1E42BBDC05B /* FamilyFeedViewModel.swift */; };
 		F02243E16E778E5302072B1B /* SleepInsightImpact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAF86945DB5CAE0340CA5D7 /* SleepInsightImpact.swift */; };
@@ -126,6 +129,9 @@
 		78645C83E18BC9A05C9CD504 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		7C45927DB747AB48BE8B68B4 /* MetricProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricProfiles.swift; sourceTree = "<group>"; };
 		7D1C1BAB065C9810674F9E76 /* MetricBreakdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricBreakdownView.swift; sourceTree = "<group>"; };
+		AA11223344556677889900AA /* MetricDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDefinition.swift; sourceTree = "<group>"; };
+		AA11223344556677889900CC /* MetricStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricStats.swift; sourceTree = "<group>"; };
+		AA11223344556677889900EE /* MetricDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDetailSheet.swift; sourceTree = "<group>"; };
 		8786ABA5F00FF07C456D21DE /* FamilyMemberRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberRowView.swift; sourceTree = "<group>"; };
 		8BDA9CEDC6CFF22673A43A1C /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		8CD9720D94C51F97181A3785 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -143,7 +149,7 @@
 		C332281F5D2548006EE4875F /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		CAED741DDAFB7E00B985982F /* SleepTune.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SleepTune.entitlements; sourceTree = "<group>"; };
 		CC0DFB4616F9B90768099BDD /* HealthKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitClient.swift; sourceTree = "<group>"; };
-		D15E97DD8536AEBB6E0F0B74 /* SleepTune.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SleepTune.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D15E97DD8536AEBB6E0F0B74 /* SleepTune.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SleepTune.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DE8A6BAAB15BE1E42BBDC05B /* FamilyFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyFeedViewModel.swift; sourceTree = "<group>"; };
 		E0BAFB1AD9FD4D275B72D666 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		E58AB51073F3E1A408737619 /* FamilyFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyFeedView.swift; sourceTree = "<group>"; };
@@ -202,6 +208,7 @@
 				3914CA082CAEE7790154BD2C /* SleepSignalType.swift */,
 				9DD500F9A1F934A8F0505CCD /* SleepStage.swift */,
 				FBEB0AE316AF9D015ED37561 /* SleepStageSample.swift */,
+				AA11223344556677889900CC /* MetricStats.swift */,
 				C490D7C3EB243B21BD99EC48 /* Family */,
 			);
 			path = Models;
@@ -324,6 +331,7 @@
 		9667B9C34018BF47DF19011E /* Scoring */ = {
 			isa = PBXGroup;
 			children = (
+				AA11223344556677889900AA /* MetricDefinition.swift */,
 				7C45927DB747AB48BE8B68B4 /* MetricProfiles.swift */,
 				9F77DCEEE7A4C1018EAA00B2 /* SleepScoreEngine.swift */,
 				95CD03A81E3ECE339E1D00BF /* SleepScoreWeights.swift */,
@@ -395,6 +403,7 @@
 				F1DF06D15A443D5C07C933D5 /* DopplerStripeView.swift */,
 				31260ECD210A48EAAC4477BA /* HealthAccessFullScreenView.swift */,
 				7D1C1BAB065C9810674F9E76 /* MetricBreakdownView.swift */,
+				AA11223344556677889900EE /* MetricDetailSheet.swift */,
 				E60F5D19B3226C53F21DA7B6 /* ScoreBreakdownView.swift */,
 				01E410F7AAE8FD210F8B333E /* ScoreHeroView.swift */,
 				2D0BF1116D4BFCF6D68A88CE /* ScoreTrendsSectionView.swift */,
@@ -471,7 +480,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					EED1DA841029F662CD89CFE6 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -486,7 +494,6 @@
 			);
 			mainGroup = 46E6706105B3813015D84AFF;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -544,6 +551,9 @@
 				118D5736B51D06E47BBBE823 /* KeychainItem.swift in Sources */,
 				E3901DADA81D1E9642CC2F4F /* LocalStore.swift in Sources */,
 				9F56EC090DAB6C607EB23135 /* MetricBreakdownView.swift in Sources */,
+				BB11223344556677889900FF /* MetricDetailSheet.swift in Sources */,
+				BB11223344556677889900BB /* MetricDefinition.swift in Sources */,
+				BB11223344556677889900DD /* MetricStats.swift in Sources */,
 				E2FF77710250CB8B1AE18A7C /* MetricProfiles.swift in Sources */,
 				9629C2A7D0EBBBDACE361BED /* MockHealthKitClient.swift in Sources */,
 				10D193CF16447D220DECF095 /* MockSleepData.swift in Sources */,
@@ -631,6 +641,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SleepTune/App/SleepTune.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = JL39GTJ62X;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SleepTune/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -648,6 +659,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = SleepTune/App/SleepTune.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = JL39GTJ62X;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				INFOPLIST_FILE = SleepTune/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -26,8 +26,10 @@ struct SleepStageChartView: View {
     }
 
     private func yDomain() -> ClosedRange<Double> {
-        let orders = stages.map { Double($0.stage.sortOrder) }
-        let lo = (orders.min() ?? 0) - 0.5
+        let orders = stages
+            .filter { $0.stage != .inBed }
+            .map { Double($0.stage.sortOrder) }
+        let lo = (orders.min() ?? 1) - 0.5
         let hi = (orders.max() ?? 4) + 0.5
         return lo...hi
     }

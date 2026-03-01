@@ -6,9 +6,16 @@ extension AppContainer {
     /// Creates a container wired to MockHealthKitClient.
     /// Auth is pre-seeded so Sign In is skipped.
     static func mock() -> AppContainer {
-        let container = AppContainer(healthKitClient: MockHealthKitClient())
+        // InMemorySleepStore ensures MockHealthKitClient is always called —
+        // no stale UserDefaults cache can shadow the mock indicators.
+        let container = AppContainer(
+            healthKitClient: MockHealthKitClient(),
+            localStore: InMemorySleepStore()
+        )
         container.authService.userID = "mock-user"
         container.authService.displayName = "You (Mock)"
+        container.dashboardViewModel.monthlyStats = MockSleepData.monthlyStats
+        container.dashboardViewModel.scoreHistory = MockSleepData.scoreHistory
         return container
     }
 }

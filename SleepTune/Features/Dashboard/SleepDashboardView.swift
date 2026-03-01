@@ -60,8 +60,10 @@ struct SleepDashboardView: View {
                     bins: buildDopplerBins(
                         stages: viewModel.lastNightStages,
                         heartRate: viewModel.lastNightHeartRateSeries,
-                        hrv: viewModel.lastNightHRVSeries
+                        hrv: viewModel.lastNightHRVSeries,
+                        monthlyAvgHR: viewModel.monthlyAverages["Overnight Heart Rate"] ?? 0
                     ),
+                    hrDeviation: hrDeviationFromBaseline,
                     onPreviousDay: { shiftDate(by: -1) },
                     onNextDay: { shiftDate(by: 1) }
                 )
@@ -78,8 +80,7 @@ struct SleepDashboardView: View {
                 if !viewModel.indicators.isEmpty {
                     MetricBreakdownView(
                         indicators: viewModel.indicators,
-                        weights: .default,
-                        monthlyAverages: viewModel.monthlyAverages
+                        monthlyStats: viewModel.monthlyStats
                     )
                     .padding(.horizontal, 20)
                 }
@@ -108,6 +109,15 @@ struct SleepDashboardView: View {
             }
         }
         .scrollIndicators(.hidden)
+    }
+
+    /// Last night's mean HR minus the user's 30-day personal baseline, in bpm.
+    /// Returns 0 if either value is unavailable.
+    private var hrDeviationFromBaseline: Double {
+        let baseline = viewModel.monthlyAverages["Overnight Heart Rate"]
+        let lastNight = viewModel.indicators.first(where: { $0.name == "Overnight Heart Rate" })?.value
+        guard let b = baseline, let n = lastNight, b > 0 else { return 0 }
+        return n - b
     }
 
     private func shiftDate(by days: Int) {

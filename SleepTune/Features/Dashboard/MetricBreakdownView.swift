@@ -5,14 +5,15 @@ import SwiftUI
 struct MetricContribution: Identifiable {
     let id: String
     let name: String
-    let value: String
-    let normalizedScore: Double     // 0–100, already inverted for "lower is better"
-    let pointContribution: Double   // contribution to overall score in pts
-    let maxPointContribution: Double
+    let formattedValue: String   // display string for the raw value
     let rawValue: Double
     let unit: String
-    let monthlyAverage: Double?
-    let isInverted: Bool
+    let normalizedScore: Double  // 0–100
+    let pointContribution: Double
+    let maxPointContribution: Double
+    let lowerIsBetter: Bool
+    let hint: String?            // static directional hint from MetricDefinition
+    let stats: MetricStats?      // 30-day stats; nil for new users
     let category: SleepIndicatorCategory
 }
 
@@ -20,8 +21,10 @@ struct MetricContribution: Identifiable {
 
 struct MetricBreakdownView: View {
     let indicators: [SleepIndicator]
-    let weights: SleepScoreWeights
-    var monthlyAverages: [String: Double] = [:]
+    var monthlyStats: [String: MetricStats] = [:]
+
+    // Category splits from default weights (architecture 40%, recovery 60%)
+    private let weights = SleepScoreWeights.default
 
     @State private var expandedCategory: SleepIndicatorCategory? = nil
 
@@ -57,94 +60,83 @@ struct MetricBreakdownView: View {
         }
     }
 
-    // MARK: - Score Math
+    // MARK: - Build contributions
+    // Driven by the actual indicators present (not the registry list), so nothing
+    // is silently dropped. Registry metadata (weight, direction, hint) is looked up
+    // per indicator; weight-0 and unregistered metrics appear as informational rows.
 
     private func contributions(for category: SleepIndicatorCategory) -> [MetricContribution] {
-        let categoryIndicators = indicators.filter { $0.category == category && $0.range != nil }
-        let categoryWeight = topLevelWeight(for: category)
+        // Start with indicators whose .category matches, then add cross-listed registry metrics
+        // (e.g. "Overnight Heart Rate" is a .sleepArchitecture indicator but also has a .recovery
+        // registry entry, so it should appear in the Recovery section too).
+        let crossListedNames = MetricRegistry.all
+            .filter { $0.category == category }
+            .map(\.name)
+        let displayIndicators = indicators.filter { indicator in
+            indicator.category == category || crossListedNames.contains(indicator.name)
+        }
+        // Deduplicate (shouldn't be needed but guard against double-add)
+        var seen = Set<String>()
+        let uniqueIndicators = displayIndicators.filter { seen.insert($0.name).inserted }
 
-        return categoryIndicators.map { indicator in
-            let subWeight = subWeight(for: indicator.name, category: category)
-            let isInv = isInverted(indicator.name)
+        let categoryWeight = category == .sleepArchitecture ? weights.architectureWeight : weights.recoveryWeight
+        let scoredTotal = totalWeight(in: category)
 
-            let normalized: Double = scoreMetric(
-                name: indicator.name,
-                value: indicator.value,
-                monthlyAvg: monthlyAverages[indicator.name]
-            ) ?? 0
-
-            let maxPts = subWeight * categoryWeight * 100
+        return uniqueIndicators.map { indicator in
+            // Look up the definition for THIS category (cross-listed metrics have two definitions)
+            let def      = MetricRegistry.all.first { $0.name == indicator.name && $0.category == category }
+                        ?? MetricRegistry.definition(for: indicator.name)
+            let weight   = def?.weight ?? 0
+            let stats    = monthlyStats[indicator.name]
+            let normalized = scoreMetric(name: indicator.name, value: indicator.value, monthlyAvg: stats?.avg) ?? 0
+            let maxPts   = scoredTotal > 0 ? weight / scoredTotal * categoryWeight * 100 : 0
             let actualPts = normalized * maxPts
 
             return MetricContribution(
                 id: indicator.name,
                 name: indicator.name,
-                value: formatted(indicator),
+                formattedValue: formatted(value: indicator.value, unit: indicator.unit),
+                rawValue: indicator.value,
+                unit: indicator.unit,
                 normalizedScore: normalized * 100,
                 pointContribution: actualPts,
                 maxPointContribution: maxPts,
-                rawValue: indicator.value,
-                unit: indicator.unit,
-                monthlyAverage: monthlyAverages[indicator.name],
-                isInverted: isInv,
+                lowerIsBetter: def?.lowerIsBetter ?? false,
+                hint: def?.hint,
+                stats: stats,
                 category: category
             )
         }
-        .sorted { $0.pointContribution > $1.pointContribution }
-    }
-
-    private func topLevelWeight(for category: SleepIndicatorCategory) -> Double {
-        switch category {
-        case .sleepArchitecture: return weights.architectureWeight
-        case .recovery:          return weights.recoveryWeight
-        default:                 return 0
-        }
-    }
-
-    private func subWeight(for name: String, category: SleepIndicatorCategory) -> Double {
-        switch category {
-        case .sleepArchitecture:
-            switch name {
-            case "Sleep Duration":   return weights.duration
-            case "Sleep Efficiency": return weights.efficiency
-            case "Sleep Latency":    return weights.latency
-            case "REM Sleep":        return weights.remPercent
-            case "Deep Sleep":       return weights.deepPercent
-            default:                 return 0.05
+        // Scored metrics first (by contribution), then informational (weight 0) by name
+        .sorted {
+            if $0.maxPointContribution != $1.maxPointContribution {
+                return $0.maxPointContribution > $1.maxPointContribution
             }
-        case .recovery:
-            switch name {
-            case "Lowest Overnight HR":  return weights.lowestHR
-            case "Time to Lowest HR":    return weights.timeToLowestHR
-            case "HRV":                  return weights.avgHRV
-            case "Respiratory Rate":     return weights.avgRR
-            case "Blood Oxygen":         return weights.spo2
-            default:                     return 0.05
-            }
-        default:
-            return 0.05
+            return $0.name < $1.name
         }
     }
 
-    private func isInverted(_ name: String) -> Bool {
-        ["Lowest Overnight HR", "Time to Lowest HR", "Long Awakenings",
-         "Sleep Latency"].contains(name)
+    private func totalWeight(in category: SleepIndicatorCategory) -> Double {
+        MetricRegistry.scoredMetrics(in: category).map(\.weight).reduce(0, +)
     }
+}
 
-    private func formatted(_ i: SleepIndicator) -> String {
-        let v = i.value
-        switch i.unit {
-        case "hr":
-            return "\(Int(v))h \(Int((v - Double(Int(v))) * 60))m"
-        case "%":
-            return String(format: "%.0f%%", v)
-        case "ms", "bpm":
-            return "\(Int(v.rounded())) \(i.unit)"
-        case "br/min":
-            return "\(Int(v.rounded())) br/min"
-        default:
-            return String(format: "%.1f \(i.unit)", v)
-        }
+// MARK: - Value Formatting
+
+func formatted(value: Double, unit: String) -> String {
+    switch unit {
+    case "hr":
+        return "\(Int(value))h \(Int((value - Double(Int(value))) * 60))m"
+    case "%":
+        return String(format: "%.0f%%", value)
+    case "ms", "bpm", "min":
+        return "\(Int(value.rounded())) \(unit)"
+    case "br/min":
+        return "\(Int(value.rounded())) br/min"
+    case "fraction":
+        return String(format: "%.2f", value)
+    default:
+        return String(format: "%.1f \(unit)", value)
     }
 }
 
@@ -157,23 +149,14 @@ struct MetricCategorySection: View {
     let isExpanded: Bool
     let onTap: () -> Void
 
-    private var sectionScore: Double {
-        let total = metrics.reduce(0) { $0 + $1.pointContribution }
-        let max   = metrics.reduce(0) { $0 + $1.maxPointContribution }
-        guard max > 0 else { return 0 }
-        return min(total / max * 100, 100)
-    }
-
     private var totalContribution: Double {
         metrics.reduce(0) { $0 + $1.pointContribution }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Section header row
             Button(action: onTap) {
                 HStack(spacing: 12) {
-                    // Color dot + name
                     Circle()
                         .fill(accentColor)
                         .frame(width: 7, height: 7)
@@ -184,15 +167,11 @@ struct MetricCategorySection: View {
 
                     Spacer()
 
-                    // Points
                     Text(String(format: "+%.1f pts", totalContribution))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(
-                            totalContribution > 8 ? DS.green : DS.textSecondary
-                        )
+                        .foregroundStyle(totalContribution > 8 ? DS.green : DS.textSecondary)
                         .monospacedDigit()
 
-                    // Chevron
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(DS.textTertiary)
@@ -230,104 +209,107 @@ struct MetricCategorySection: View {
 
 struct MetricContributionRow: View {
     let metric: MetricContribution
+    @State private var showDetail = false
 
     private var barColor: Color {
         metric.normalizedScore >= 80 ? DS.green : DS.purple
     }
 
-    private func monthlyDeltaText(for metric: MetricContribution) -> String? {
-        guard let avg = metric.monthlyAverage else { return nil }
-        let delta = metric.rawValue - avg
-        guard abs(delta) >= 0.5 else { return "≈ 30d avg" }
-        let sign = delta > 0 ? "+" : "-"
-        let formatted: String
-        switch metric.unit {
-        case "hr":
-            let mins = Int(abs(delta) * 60)
-            formatted = "\(mins)m"
-        case "%":
-            formatted = String(format: "%.0f%%", abs(delta))
-        default:
-            formatted = String(format: "%.0f %@", abs(delta), metric.unit)
+    /// Subtitle: show actual 30d average (transparent) + delta tonight; fall back to static hint.
+    private var subtitle: (text: String, color: Color)? {
+        if let stats = metric.stats {
+            let avgText = "avg \(formatted(value: stats.avg, unit: metric.unit))"
+            let delta = metric.rawValue - stats.avg
+            let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
+            if abs(delta) < threshold {
+                return (avgText, DS.textTertiary)
+            }
+            // Build delta string
+            let sign = delta > 0 ? "+" : ""
+            let deltaStr: String
+            switch metric.unit {
+            case "hr":
+                let mins = Int(abs(delta) * 60)
+                deltaStr = "\(delta > 0 ? "+" : "-")\(mins)m"
+            case "%":
+                deltaStr = "\(sign)\(String(format: "%.0f", delta))%"
+            case "fraction":
+                deltaStr = "\(sign)\(String(format: "%.2f", delta))"
+            default:
+                deltaStr = "\(sign)\(Int(abs(delta).rounded())) \(metric.unit)"
+            }
+            // Good if: lowerIsBetter & delta < 0, or !lowerIsBetter & delta > 0
+            let isGood = metric.lowerIsBetter ? delta < 0 : delta > 0
+            let color: Color = isGood ? DS.green : Color(red: 1.0, green: 0.42, blue: 0.42)
+            return ("\(avgText) · \(deltaStr) tonight", color)
+        } else if let hint = metric.hint {
+            return (hint, DS.textTertiary)
         }
-        return "\(sign)\(formatted) vs 30d avg"
-    }
-
-    private func deltaColor(for metric: MetricContribution) -> Color {
-        guard let avg = metric.monthlyAverage else { return DS.textTertiary }
-        let delta = metric.rawValue - avg
-        guard abs(delta) >= 0.5 else { return DS.textTertiary }
-        // For inverted metrics (lower=better), negative delta is good
-        let isGood = metric.isInverted ? delta < 0 : delta > 0
-        return isGood ? DS.green : Color(red: 1.0, green: 0.42, blue: 0.42)
+        return nil
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .center, spacing: 10) {
-                // Name + monthly delta
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(metric.name)
-                        .font(.subheadline)
-                        .foregroundStyle(DS.textPrimary)
-
-                    if let subtitle = monthlyDeltaText(for: metric) {
-                        Text(subtitle)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(deltaColor(for: metric))
-                    }
-                }
-
-                Spacer()
-
-                // Value + pts
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(metric.value)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(DS.textPrimary)
-                        .monospacedDigit()
-
-                    Text(String(format: "+%.2f pts", metric.pointContribution))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(
-                            metric.pointContribution > metric.maxPointContribution * 0.75
-                            ? DS.green
-                            : DS.textTertiary
-                        )
-                        .monospacedDigit()
-                }
+        Button {
+            if metric.stats != nil {
+                showDetail = true
             }
+        } label: {
+            VStack(spacing: 8) {
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(metric.name)
+                            .font(.subheadline)
+                            .foregroundStyle(DS.textPrimary)
 
-            // Contribution bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    // max possible
-                    Capsule()
-                        .fill(DS.border)
-                        .frame(height: 3)
-                    // actual
-                    Capsule()
-                        .fill(barColor)
-                        .frame(
-                            width: max(geo.size.width * metric.normalizedScore / 100, 3),
-                            height: 3
-                        )
+                        if let sub = subtitle {
+                            Text(sub.text)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(sub.color)
+                        }
+                    }
 
-                    // Glow on high scores
-                    if metric.normalizedScore >= 80 {
-                        Capsule()
-                            .fill(DS.green.opacity(0.35))
-                            .frame(
-                                width: max(geo.size.width * metric.normalizedScore / 100, 3),
-                                height: 5
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(metric.formattedValue)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(DS.textPrimary)
+                            .monospacedDigit()
+
+                        Text(String(format: "+%.2f pts", metric.pointContribution))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(
+                                metric.pointContribution > metric.maxPointContribution * 0.75
+                                ? DS.green : DS.textTertiary
                             )
-                            .blur(radius: 2)
+                            .monospacedDigit()
                     }
                 }
+
+                // Contribution bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(DS.border).frame(height: 3)
+                        Capsule()
+                            .fill(barColor)
+                            .frame(width: max(geo.size.width * metric.normalizedScore / 100, 3), height: 3)
+                        if metric.normalizedScore >= 80 {
+                            Capsule()
+                                .fill(DS.green.opacity(0.35))
+                                .frame(width: max(geo.size.width * metric.normalizedScore / 100, 3), height: 5)
+                                .blur(radius: 2)
+                        }
+                    }
+                }
+                .frame(height: 5)
             }
-            .frame(height: 5)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showDetail) {
+            MetricDetailSheet(metric: metric)
+        }
     }
 }

@@ -16,7 +16,10 @@ final class DashboardViewModel {
     var lastNightRespiratoryRateSeries: SleepChartSeries?
     var scoreHistory: [SleepScoreTrendPoint]
     var trendRange: SleepScoreTrendRange
-    var monthlyAverages: [String: Double] = [:]
+    var monthlyStats: [String: MetricStats] = [:]
+
+    /// Derived averages for use in scoreMetric() — computed from monthlyStats.
+    var monthlyAverages: [String: Double] { monthlyStats.mapValues(\.avg) }
 
     private let healthKitClient: HealthKitClient
     private let scoreEngine: SleepScoreEngine
@@ -78,7 +81,7 @@ final class DashboardViewModel {
             recalculateScore()
             await loadTrendHistory()
             await refreshLastNightData()
-            await loadMonthlyAverages()
+            await loadMonthlyStats()
         } else {
             // No cache — fetch from HealthKit
             await refreshFromHealthKit()
@@ -108,7 +111,7 @@ final class DashboardViewModel {
             recalculateScore()
             await refreshLastNightData()
             await loadTrendHistory()
-            await loadMonthlyAverages()
+            await loadMonthlyStats()
         } catch {
             authorizationState = await healthKitClient.authorizationState()
             if authorizationState == .authorized {
@@ -138,7 +141,12 @@ final class DashboardViewModel {
         summary = scoreEngine.score(indicators: indicators, weights: .default, monthlyAverages: monthlyAverages)
         let capturedSummary = summary
         Task { @MainActor in
-            await localStore.saveScore(capturedSummary.score, for: selectedDate)
+            await localStore.saveScore(
+                capturedSummary.score,
+                sleepScore: capturedSummary.sleepScore,
+                recoveryScore: capturedSummary.recoveryScore,
+                for: selectedDate
+            )
             await loadTrendHistory()
             await publishToCloudKit(capturedSummary)
         }
@@ -165,7 +173,12 @@ final class DashboardViewModel {
                 await localStore.saveIndicators(fetched, for: day)
                 // Persist score for trend chart
                 let daySummary = scoreEngine.score(indicators: fetched, weights: .default)
-                await localStore.saveScore(daySummary.score, for: day)
+                await localStore.saveScore(
+                    daySummary.score,
+                    sleepScore: daySummary.sleepScore,
+                    recoveryScore: daySummary.recoveryScore,
+                    for: day
+                )
             }
         }
         await loadTrendHistory()
@@ -253,21 +266,26 @@ final class DashboardViewModel {
         scoreHistory = []
     }
 
-    private func loadMonthlyAverages() async {
+    private func loadMonthlyStats() async {
         let cal = Calendar.current
         let today = Date()
-        var totals: [String: (sum: Double, count: Int)] = [:]
+        var totals: [String: (sum: Double, min: Double, max: Double, count: Int)] = [:]
         for offset in 1...30 {
             guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
             let cached = await localStore.loadIndicators(for: day)
             for indicator in cached {
-                var entry = totals[indicator.name] ?? (0, 0)
-                entry.sum += indicator.value
-                entry.count += 1
-                totals[indicator.name] = entry
+                var e = totals[indicator.name] ?? (0, .infinity, -.infinity, 0)
+                e.sum   += indicator.value
+                e.min    = Swift.min(e.min, indicator.value)
+                e.max    = Swift.max(e.max, indicator.value)
+                e.count += 1
+                totals[indicator.name] = e
             }
         }
-        monthlyAverages = totals.compactMapValues { $0.count > 0 ? $0.sum / Double($0.count) : nil }
+        monthlyStats = totals.compactMapValues { t in
+            guard t.count > 0, t.min != .infinity else { return nil }
+            return MetricStats(avg: t.sum / Double(t.count), min: t.min, max: t.max, count: t.count)
+        }
     }
 
     private func loadTrendHistory() async {

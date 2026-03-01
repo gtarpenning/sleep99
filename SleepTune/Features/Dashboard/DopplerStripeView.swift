@@ -17,9 +17,9 @@ struct DopplerBin: Sendable {
     /// 0 = bad/stressed/awake, 1 = excellent deep recovery
     var quality: Double {
         if awakeWeight >= 0.85 { return 0.0 }
-        let q = stageDepth       * 0.40
-              + (1 - hrDelta)    * 0.25
-              + (1 - hrvDelta)   * 0.25
+        let q = stageDepth        * 0.35
+              + (1 - hrDelta)     * 0.35   // more weight → bigger color shift with HR
+              + (1 - hrvDelta)    * 0.20
               + (1 - awakeWeight) * 0.10
         return max(0, min(1, q))
     }
@@ -74,6 +74,7 @@ func buildDopplerBins(
     stages: [SleepStageSample],
     heartRate: SleepChartSeries?,
     hrv: SleepChartSeries?,
+    monthlyAvgHR: Double = 0,
     binSeconds: TimeInterval = 60
 ) -> [DopplerBin] {
     // Only include from first sleep to last sleep (trim leading/trailing in-bed)
@@ -135,14 +136,13 @@ func buildDopplerBins(
         case nil:         0.40
         }
 
-        // HR delta: how far above the nightly low is this bin's average?
-        let binHR = hrPoints.filter { $0.date >= t && $0.date < binEnd }.map { $0.value }
+        // HR delta: interpolate HR at bin midpoint (handles sparse ~5-min HealthKit samples).
         let hrDelta: Double
-        if binHR.isEmpty {
-            hrDelta = 0
+        let ref = monthlyAvgHR > 0 ? monthlyAvgHR : hrBaseline
+        if let interpolated = interpolateHR(at: binMid, from: hrPoints) {
+            hrDelta = min(max(0.5 + (interpolated - ref) / 20.0, 0), 1.0)
         } else {
-            let avg = binHR.reduce(0, +) / Double(binHR.count)
-            hrDelta = min(max(avg - hrLow, 0) / hrRange, 1.0)
+            hrDelta = 0.5
         }
 
         // HRV delta: how far below baseline?
@@ -170,6 +170,25 @@ func buildDopplerBins(
     return bins
 }
 
+/// Linear interpolation of HR at a given date from sparse sorted samples.
+/// Returns nil only if there are no samples at all.
+private func interpolateHR(at date: Date, from points: [SleepChartPoint]) -> Double? {
+    guard !points.isEmpty else { return nil }
+    // Exact hit or find surrounding samples
+    if let exact = points.first(where: { $0.date == date }) { return exact.value }
+    let before = points.last  { $0.date <= date }
+    let after  = points.first { $0.date >= date }
+    switch (before, after) {
+    case let (b?, a?) where b.date != a.date:
+        let span = a.date.timeIntervalSince(b.date)
+        let frac = date.timeIntervalSince(b.date) / span
+        return b.value + (a.value - b.value) * frac
+    case let (b?, nil): return b.value
+    case let (nil, a?): return a.value
+    default: return points.first?.value
+    }
+}
+
 // MARK: - DopplerStripeView
 
 struct DopplerStripeView: View {
@@ -195,20 +214,28 @@ struct DopplerStripeView: View {
         let binW = size.width / CGFloat(n)
         let midY = size.height / 2
 
-        // Smooth the quality signal with a small rolling average to avoid harsh edges
+        // Smooth both quality and hrDelta to avoid single-bin noise
         let smoothed = smoothQualities(bins: bins, radius: 2)
+        let smoothedHR = smoothHRDeltas(bins: bins, radius: 2)
 
         for (i, bin) in bins.enumerated() {
             let q = smoothed[i]
-            let color = qualityColor(q)
+            let hrD = smoothedHR[i]
+
+            // Base quality color
+            var color = qualityColor(q)
+
+            // HR warmth override: linear blend toward red above nightly median.
+            // hrD=0.5 = at baseline, hrD=1.0 = +10 bpm above baseline.
+            let hrAbove = max(0, hrD - 0.5) * 2  // 0…1
+            if hrAbove > 0 {
+                let warmRed = Color(red: 1.0, green: 0.15, blue: 0.05)
+                color = lerpColor(color, warmRed, t: min(hrAbove * 0.90, 0.90))
+            }
 
             let xLeft = CGFloat(i) * binW
             let w = binW + 0.5 // slight overdraw to avoid hairline gaps
 
-            // Height encoding:
-            // - Awake bins: short bright spike (the event is the point)
-            // - Deep/REM: full height
-            // - Light sleep: 80% height
             let isAwake = bin.awakeWeight > 0.7
             let frac: CGFloat = isAwake ? 0.55 : CGFloat(0.65 + bin.stageDepth * 0.35)
             let barH = size.height * frac
@@ -220,8 +247,8 @@ struct DopplerStripeView: View {
                 height: barH
             )
 
-            // Alpha: awake bins pop with high alpha, deep sleep is solid
-            let alpha: Double = isAwake ? 0.90 : (0.55 + q * 0.45)
+            // Uniform alpha — don't let quality drive opacity or blue bins win twice
+            let alpha: Double = isAwake ? 0.90 : 0.88
 
             ctx.fill(Path(rect), with: .color(color.opacity(alpha)))
         }
@@ -252,6 +279,16 @@ struct DopplerStripeView: View {
             let hi = min(n - 1, i + radius)
             let slice = bins[lo...hi]
             return slice.map { $0.quality }.reduce(0, +) / Double(slice.count)
+        }
+    }
+
+    private func smoothHRDeltas(bins: [DopplerBin], radius: Int) -> [Double] {
+        let n = bins.count
+        return (0..<n).map { i in
+            let lo = max(0, i - radius)
+            let hi = min(n - 1, i + radius)
+            let slice = bins[lo...hi]
+            return slice.map { $0.hrDelta }.reduce(0, +) / Double(slice.count)
         }
     }
 }

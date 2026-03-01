@@ -26,22 +26,44 @@ struct ScoreBreakdownView: View {
         }
     }
 
+    // Top-N metrics per card, ordered by registry weight descending (tiebreak: name).
+    private static let cardLimit = 4
+
     private func metrics(for category: SleepIndicatorCategory) -> [CardMetric] {
-        indicators
-            .filter { $0.category == category && $0.range != nil }
-            .prefix(4)
-            .map { CardMetric(name: $0.name, value: formatted($0), source: $0.source) }
+        let orderedNames = MetricRegistry.scoredMetrics(in: category)
+            .sorted {
+                if $0.weight != $1.weight { return $0.weight > $1.weight }
+                return $0.name < $1.name
+            }
+            .prefix(Self.cardLimit)
+            .map(\.name)
+
+        return orderedNames.compactMap { name in
+            guard let indicator = indicators.first(where: { $0.name == name }) else { return nil }
+            return CardMetric(name: shortName(name), value: formatted(indicator), source: indicator.source)
+        }
+    }
+
+    /// Shorter display names for the compact card layout.
+    private func shortName(_ name: String) -> String {
+        switch name {
+        case "Sleep Duration":      return "Duration"
+        case "Overnight Heart Rate": return "Avg HR"
+        case "Lowest Overnight HR": return "Lowest HR"
+        case "Time to Lowest HR":   return "Min HR timing"
+        case "Respiratory Rate":    return "Resp rate"
+        default:                    return name
+        }
     }
 
     private func formatted(_ i: SleepIndicator) -> String {
         let v = i.value
         switch i.unit {
-        case "hr":
-            return "\(Int(v))h \(Int((v - Double(Int(v))) * 60))m"
-        case "%", "ms", "bpm", "br/min":
-            return "\(Int(v.rounded())) \(i.unit)"
-        default:
-            return String(format: "%.1f \(i.unit)", v)
+        case "hr":       return "\(Int(v))h \(Int((v - Double(Int(v))) * 60))m"
+        case "min":      return "\(Int(v.rounded()))m"
+        case "fraction": return String(format: "%.2f", v)
+        case "%", "ms", "bpm", "br/min": return "\(Int(v.rounded())) \(i.unit)"
+        default:         return String(format: "%.1f \(i.unit)", v)
         }
     }
 }
