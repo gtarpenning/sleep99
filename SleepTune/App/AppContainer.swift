@@ -1,50 +1,57 @@
 import Observation
 import Foundation
 
+#if DEBUG
+extension AppContainer {
+    /// Creates a container wired to MockHealthKitClient.
+    /// Auth is pre-seeded so Sign In is skipped.
+    static func mock() -> AppContainer {
+        let container = AppContainer(healthKitClient: MockHealthKitClient())
+        container.authService.userID = "mock-user"
+        container.authService.displayName = "You (Mock)"
+        return container
+    }
+}
+#endif
+
 @MainActor
 @Observable
 final class AppContainer {
+    let authService: AuthService
+    let cloudKitService: CloudKitService
     let dashboardViewModel: DashboardViewModel
     let settingsViewModel: SettingsViewModel
-    let shareViewModel: ShareViewModel
+    let familyFeedViewModel: FamilyFeedViewModel
 
     private let healthKitClient: HealthKitClient
     private let scoreEngine: SleepScoreEngine
     private let localStore: SleepLocalStore
-    private let syncCoordinator: SyncCoordinator
 
     init(
         healthKitClient: HealthKitClient = HealthKitClient(),
         scoreEngine: SleepScoreEngine = SleepScoreEngine(),
-        localStore: SleepLocalStore = InMemorySleepLocalStore(),
-        syncCoordinator: SyncCoordinator = SyncCoordinator()
+        localStore: SleepLocalStore = UserDefaultsSleepStore()
     ) {
+        let auth = AuthService()
+        let cloudKit = CloudKitService()
+
         self.healthKitClient = healthKitClient
         self.scoreEngine = scoreEngine
         self.localStore = localStore
-        self.syncCoordinator = syncCoordinator
+        self.authService = auth
+        self.cloudKitService = cloudKit
 
-        let dashboardViewModel = DashboardViewModel(
+        self.dashboardViewModel = DashboardViewModel(
             healthKitClient: healthKitClient,
             scoreEngine: scoreEngine,
             localStore: localStore,
-            syncCoordinator: syncCoordinator
+            authService: auth,
+            cloudKitService: cloudKit
         )
-        self.dashboardViewModel = dashboardViewModel
-        self.settingsViewModel = SettingsViewModel(localStore: localStore, healthKitClient: healthKitClient)
-        self.shareViewModel = ShareViewModel(dashboardViewModel: dashboardViewModel)
-
-        Task { @MainActor in
-            await syncCoordinator.track(AnalyticsEvent(name: AnalyticsEventName.appLaunched))
-        }
-    }
-
-    func scheduleBackgroundSync() {
-        syncCoordinator.scheduleBackgroundSync()
-    }
-
-    func handleBackgroundRefresh() async {
-        await syncCoordinator.syncIfNeeded()
-        syncCoordinator.scheduleBackgroundSync()
+        self.settingsViewModel = SettingsViewModel(healthKitClient: healthKitClient)
+        self.familyFeedViewModel = FamilyFeedViewModel(
+            authService: auth,
+            cloudKitService: cloudKit
+        )
     }
 }

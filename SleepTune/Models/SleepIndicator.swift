@@ -1,6 +1,6 @@
 import Foundation
 
-struct SleepIndicator: Identifiable, Hashable {
+struct SleepIndicator: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
     var detail: String
@@ -8,9 +8,21 @@ struct SleepIndicator: Identifiable, Hashable {
     var unit: String
     var category: SleepIndicatorCategory
     var source: SleepIndicatorSource
-    var range: ClosedRange<Double>?
+    var rangeMin: Double?
+    var rangeMax: Double?
     var contribution: Double
     var isManualOverride: Bool
+
+    var range: ClosedRange<Double>? {
+        get {
+            guard let min = rangeMin, let max = rangeMax else { return nil }
+            return min...max
+        }
+        set {
+            rangeMin = newValue?.lowerBound
+            rangeMax = newValue?.upperBound
+        }
+    }
 
     init(
         id: UUID = UUID(),
@@ -31,7 +43,8 @@ struct SleepIndicator: Identifiable, Hashable {
         self.unit = unit
         self.category = category
         self.source = source
-        self.range = range
+        self.rangeMin = range?.lowerBound
+        self.rangeMax = range?.upperBound
         self.contribution = contribution
         self.isManualOverride = isManualOverride
     }
@@ -43,7 +56,7 @@ struct SleepIndicator: Identifiable, Hashable {
             value: 0,
             unit: "",
             category: .recovery,
-            source: .manual
+            source: .appleHealth
         )
     }
 }

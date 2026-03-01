@@ -22,11 +22,20 @@
 	<string>1</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>sleeptune reads your sleep and recovery signals to calculate your sleep score.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>sleeptune can update Apple Health with sleep information only when you choose to save it.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 </dict>
 </plist>

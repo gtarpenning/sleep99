@@ -4,7 +4,8 @@ struct SleepScoreSummary: Hashable {
     var date: Date
     var score: Double
     var trend: Double
-    var components: [SleepScoreComponent]
+    var sleepScore: Double
+    var recoveryScore: Double
     var confidence: Double
-    var note: String
+    var primarySource: SleepIndicatorSource
 }

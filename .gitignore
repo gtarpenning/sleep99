@@ -1,1 +1,27 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# SPM
+.build/
+.swiftpm/
+
+# Node / tooling
+node_modules/
+package-lock.json
+*.log
+
+# Misc
 .cache/
+*.orig

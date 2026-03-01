@@ -9,49 +9,36 @@ struct SleepStageChartView: View {
         let domain = resolvedDomain()
         Chart(stages, id: \.self) { sample in
             let yStart = Double(sample.stage.sortOrder) - 0.45
-            let yEnd = Double(sample.stage.sortOrder) + 0.45
-
+            let yEnd   = Double(sample.stage.sortOrder) + 0.45
             RectangleMark(
                 xStart: .value("Start", sample.startDate),
-                xEnd: .value("End", sample.endDate),
+                xEnd:   .value("End",   sample.endDate),
                 yStart: .value("Stage Start", yStart),
-                yEnd: .value("Stage End", yEnd)
+                yEnd:   .value("Stage End",   yEnd)
             )
-            .foregroundStyle(stageColor(for: sample.stage))
+            .foregroundStyle(DS.stageColor(for: sample.stage))
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
-        .chartYScale(domain: -0.5...5.5)
+        .chartYScale(domain: yDomain())
         .chartXScale(domain: domain)
+        .background(DS.surfaceHigh, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    private func stageColor(for stage: SleepStage) -> Color {
-        switch stage {
-        case .inBed:
-            return .gray.opacity(0.2)
-        case .awake:
-            return .orange.opacity(0.6)
-        case .asleep:
-            return .blue.opacity(0.4)
-        case .asleepCore:
-            return .blue.opacity(0.65)
-        case .asleepDeep:
-            return .indigo.opacity(0.75)
-        case .asleepREM:
-            return .purple.opacity(0.65)
-        }
+    private func yDomain() -> ClosedRange<Double> {
+        let orders = stages.map { Double($0.stage.sortOrder) }
+        let lo = (orders.min() ?? 0) - 0.5
+        let hi = (orders.max() ?? 4) + 0.5
+        return lo...hi
     }
 
     private func resolvedDomain() -> ClosedRange<Date> {
-        if let xDomain {
-            return xDomain
+        if let xDomain { return xDomain }
+        guard let min = stages.map(\.startDate).min(),
+              let max = stages.map(\.endDate).max() else {
+            let now = Date(); return now...now
         }
-        guard let minStart = stages.map(\.startDate).min(),
-              let maxEnd = stages.map(\.endDate).max()
-        else {
-            let now = Date()
-            return now...now
-        }
-        return minStart...maxEnd
+        return min...max
     }
 }
+

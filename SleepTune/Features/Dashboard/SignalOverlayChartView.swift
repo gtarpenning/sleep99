@@ -38,10 +38,15 @@ struct SignalOverlayChartView: View {
                 }
             }
         }
+        .chartForegroundStyleScale(
+            domain: ["Heart Rate", "HRV", "Respiratory Rate"],
+            range:  [hrColor, hrvColor, rrColor]
+        )
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartLegend(.hidden)
         .chartXScale(domain: domain)
+        .chartYScale(domain: yDomain())
         .chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle()
@@ -63,6 +68,15 @@ struct SignalOverlayChartView: View {
                     )
             }
         }
+    }
+
+    private func yDomain() -> ClosedRange<Double> {
+        let allValues = series.flatMap { $0.points.map(\.value) }
+        guard let minVal = allValues.min(), let maxVal = allValues.max(), minVal < maxVal else {
+            return 0...100
+        }
+        let padding = (maxVal - minVal) * 0.12
+        return (minVal - padding)...(maxVal + padding)
     }
 
     private func resolvedDomain() -> ClosedRange<Date> {

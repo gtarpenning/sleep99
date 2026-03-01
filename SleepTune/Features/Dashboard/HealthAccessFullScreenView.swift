@@ -6,79 +6,98 @@ struct HealthAccessFullScreenView: View {
     let openSettings: () -> Void
 
     var body: some View {
-        VStack {
-            Spacer()
+        ZStack {
+            DS.bg.ignoresSafeArea()
 
-            VStack(alignment: .leading) {
-                Text(title)
-                    .font(.title2)
-                    .bold()
+            VStack(spacing: 0) {
+                Spacer()
 
-                Text(message)
-                    .foregroundStyle(.secondary)
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(DS.purpleDim)
+                        .frame(width: 80, height: 80)
+                    Image(systemName: "heart.text.square.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(DS.purple)
+                }
+                .padding(.bottom, 28)
 
-                if showsButton {
-                    Button("Connect Apple Health", systemImage: "heart.text.square", action: requestAccess)
-                        .buttonStyle(.borderedProminent)
+                // Text
+                VStack(spacing: 10) {
+                    Text(title)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(DS.textPrimary)
+                        .multilineTextAlignment(.center)
+
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(DS.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
                 }
 
-                if showsSettingsButton {
-                    Button("Open Settings", systemImage: "gearshape", action: openSettings)
+                // Buttons
+                VStack(spacing: 10) {
+                    if showsButton {
+                        Button(action: requestAccess) {
+                            HStack {
+                                Image(systemName: "heart.text.square")
+                                Text("Connect Apple Health")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(DS.purple, in: RoundedRectangle(cornerRadius: 14))
+                            .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if showsSettingsButton {
+                        Button(action: openSettings) {
+                            HStack {
+                                Image(systemName: "gearshape")
+                                Text("Open Settings")
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(DS.surface, in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14).strokeBorder(DS.border, lineWidth: 0.5)
+                            )
+                            .foregroundStyle(DS.textPrimary)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.top, 36)
+                .padding(.horizontal, 32)
+
+                Spacer()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.thinMaterial)
-            .clipShape(.rect(cornerRadius: 20))
-
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-        .background(.background)
     }
 
     private var title: String {
         switch authorizationState {
-        case .unavailable:
-            return "Health data unavailable"
-        case .needsPermission:
-            return "Connect Apple Health"
-        case .denied:
-            return "Health access denied"
-        case .authorized:
-            return "Health data connected"
+        case .unavailable:     return "Not Available"
+        case .needsPermission: return "Connect Health"
+        case .denied:          return "Access Denied"
+        case .authorized:      return "Connected"
         }
     }
 
     private var message: String {
         switch authorizationState {
-        case .unavailable:
-            return "Health data isn’t available on this device."
-        case .needsPermission:
-            return "We’ll use sleep and recovery signals to power your score."
-        case .denied:
-            return "Enable access in Settings to sync sleep signals."
-        case .authorized:
-            return "We’ll keep syncing your latest sleep signals."
+        case .unavailable:     return "Health data isn't available on this device."
+        case .needsPermission: return "Grant access to sleep, heart rate, and recovery signals to generate your score."
+        case .denied:          return "Open the Health app, go to Sharing → Apps → SleepTune, and enable the data types you want to share."
+        case .authorized:      return "Syncing your health data."
         }
     }
 
-    private var showsButton: Bool {
-        switch authorizationState {
-        case .needsPermission:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var showsSettingsButton: Bool {
-        switch authorizationState {
-        case .denied:
-            return true
-        default:
-            return false
-        }
-    }
+    private var showsButton: Bool         { authorizationState == .needsPermission }
+    private var showsSettingsButton: Bool { authorizationState == .denied }
 }

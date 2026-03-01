@@ -6,24 +6,26 @@ struct ScoreTrendsSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Score Trends")
-                .font(.headline)
+            DSSectionHeader(title: "Trend")
 
+            // Range picker
             Picker("Range", selection: $viewModel.trendRange) {
                 ForEach(SleepScoreTrendRange.allCases) { range in
                     Text(range.title).tag(range)
                 }
             }
             .pickerStyle(.segmented)
-            .tint(.gray)
-            .background(.gray.opacity(0.18), in: .rect(cornerRadius: 10))
+            .colorScheme(.dark)
             .onChange(of: viewModel.trendRange) { _, newValue in
                 viewModel.updateTrendRange(newValue)
             }
 
             if viewModel.scoreHistory.isEmpty {
-                Text("No trend data yet.")
-                    .foregroundStyle(.secondary)
+                Text("Scores will appear here as you sync data.")
+                    .font(.subheadline)
+                    .foregroundStyle(DS.textTertiary)
+                    .frame(height: 120, alignment: .center)
+                    .frame(maxWidth: .infinity)
             } else {
                 Chart(viewModel.scoreHistory) { point in
                     LineMark(
@@ -31,22 +33,42 @@ struct ScoreTrendsSectionView: View {
                         y: .value("Score", point.score)
                     )
                     .interpolationMethod(.catmullRom)
+                    .foregroundStyle(DS.purple)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
 
                     AreaMark(
                         x: .value("Date", point.date),
                         y: .value("Score", point.score)
                     )
-                    .foregroundStyle(.linearGradient(colors: [.blue.opacity(0.25), .clear], startPoint: .top, endPoint: .bottom))
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [DS.purple.opacity(0.3), DS.purple.opacity(0)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                 }
                 .chartYScale(domain: 0...100)
                 .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .frame(height: 140)
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: [0, 50, 100]) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(DS.border)
+                        AxisValueLabel {
+                            if let v = value.as(Int.self) {
+                                Text("\(v)")
+                                    .font(.caption2)
+                                    .foregroundStyle(DS.textTertiary)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 130)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .clipShape(.rect(cornerRadius: 20))
+        .padding(16)
+        .background(DS.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(DS.border, lineWidth: 0.5))
     }
 }

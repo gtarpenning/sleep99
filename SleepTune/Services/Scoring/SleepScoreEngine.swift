@@ -4,104 +4,87 @@ struct SleepScoreEngine {
     func score(
         indicators: [SleepIndicator],
         weights: SleepScoreWeights,
-        feeling: SleepFeeling?
+        monthlyAverages: [String: Double] = [:]
     ) -> SleepScoreSummary {
-        let normalized = normalizeIndicators(indicators)
-        let components = buildComponents(from: normalized, weights: weights)
-        let baseScore = components.map { $0.contribution }.reduce(0, +)
-        let adjustedScore = applyFeelingAdjustment(baseScore, feeling: feeling)
-        let clampedScore = min(max(adjustedScore, 0), 100)
+        let sleepScore    = buildArchitectureScore(indicators, weights: weights, avgs: monthlyAverages)
+        let recoveryScore = buildRecoveryScore(indicators, weights: weights, avgs: monthlyAverages)
+
+        let overall = (sleepScore * weights.architectureWeight +
+                       recoveryScore * weights.recoveryWeight) * 100
 
         return SleepScoreSummary(
             date: Date(),
-            score: clampedScore,
-            trend: 0,
-            components: components,
-            confidence: confidence(for: indicators),
-            note: note(for: indicators, feeling: feeling)
+            score:         min(max(overall, 0), 100),
+            trend:         0,
+            sleepScore:    min(max(sleepScore * 100, 0), 100),
+            recoveryScore: min(max(recoveryScore * 100, 0), 100),
+            confidence:    confidence(for: indicators),
+            primarySource: determinePrimarySource(from: indicators)
         )
     }
 
-    private func normalizeIndicators(_ indicators: [SleepIndicator]) -> [SleepIndicator] {
-        indicators.map { indicator in
-            guard let range = indicator.range else { return indicator }
-            let normalizedValue = normalize(indicator.value, within: range)
-            var updated = indicator
-            updated.contribution = normalizedValue
-            return updated
+    // MARK: - Category scores
+
+    private func buildArchitectureScore(
+        _ indicators: [SleepIndicator],
+        weights: SleepScoreWeights,
+        avgs: [String: Double]
+    ) -> Double {
+        let arch = indicators.filter { $0.category == .sleepArchitecture }
+        return weightedAverage([
+            (scored(arch, name: "Sleep Duration",   avgs: avgs), weights.duration),
+            (scored(arch, name: "Sleep Efficiency", avgs: avgs), weights.efficiency),
+            (scored(arch, name: "Sleep Latency",    avgs: avgs), weights.latency),
+            (scored(arch, name: "REM Sleep",        avgs: avgs), weights.remPercent),
+            (scored(arch, name: "Deep Sleep",       avgs: avgs), weights.deepPercent),
+        ])
+    }
+
+    private func buildRecoveryScore(
+        _ indicators: [SleepIndicator],
+        weights: SleepScoreWeights,
+        avgs: [String: Double]
+    ) -> Double {
+        let rec = indicators.filter { $0.category == .recovery }
+        return weightedAverage([
+            (scored(rec, name: "Lowest Overnight HR",  avgs: avgs), weights.lowestHR),
+            (scored(rec, name: "HRV",                  avgs: avgs), weights.avgHRV),
+            (scored(rec, name: "Respiratory Rate",     avgs: avgs), weights.avgRR),
+            (scored(rec, name: "Time to Lowest HR",    avgs: avgs), weights.timeToLowestHR),
+            (scored(rec, name: "Blood Oxygen",         avgs: avgs), weights.spo2),
+        ])
+    }
+
+    // MARK: - Helpers
+
+    /// Look up the indicator by name, score it via MetricProfiles registry.
+    private func scored(_ indicators: [SleepIndicator], name: String, avgs: [String: Double]) -> Double? {
+        guard let indicator = indicators.first(where: { $0.name == name }) else { return nil }
+        return scoreMetric(name: name, value: indicator.value, monthlyAvg: avgs[name])
+    }
+
+    private func weightedAverage(_ pairs: [(Double?, Double)]) -> Double {
+        var totalWeight = 0.0
+        var weightedSum = 0.0
+        for (value, weight) in pairs {
+            guard let value else { continue }
+            weightedSum += value * weight
+            totalWeight += weight
         }
-    }
-
-    private func buildComponents(
-        from indicators: [SleepIndicator],
-        weights: SleepScoreWeights
-    ) -> [SleepScoreComponent] {
-        let grouped = Dictionary(grouping: indicators, by: \ .category)
-
-        return grouped.map { category, categoryIndicators in
-            let average = averageContribution(for: categoryIndicators)
-            let weight = weight(for: category, weights: weights)
-            return SleepScoreComponent(
-                name: category.rawValue.capitalized,
-                value: average,
-                weight: weight,
-                contribution: average * weight * 100
-            )
-        }
-    }
-
-    private func weight(for category: SleepIndicatorCategory, weights: SleepScoreWeights) -> Double {
-        switch category {
-        case .recovery:
-            return weights.recovery
-        case .sleepArchitecture:
-            return weights.architecture
-        case .consistency:
-            return weights.consistency
-        case .environment:
-            return weights.environment
-        case .behavior:
-            return weights.behavior
-        }
-    }
-
-    private func averageContribution(for indicators: [SleepIndicator]) -> Double {
-        let valid = indicators
-            .filter { $0.range != nil }
-            .map(\ .contribution)
-        guard !valid.isEmpty else { return 0 }
-        return valid.reduce(0, +) / Double(valid.count)
-    }
-
-    private func normalize(_ value: Double, within range: ClosedRange<Double>) -> Double {
-        let normalized = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
-        return min(max(normalized, 0), 1)
-    }
-
-    private func applyFeelingAdjustment(_ score: Double, feeling: SleepFeeling?) -> Double {
-        guard let feeling else { return score }
-        switch feeling {
-        case .low:
-            return score - 6
-        case .okay:
-            return score
-        case .good:
-            return score + 4
-        case .energized:
-            return score + 8
-        }
+        guard totalWeight > 0 else { return 0 }
+        return weightedSum / totalWeight
     }
 
     private func confidence(for indicators: [SleepIndicator]) -> Double {
-        let hasWatchData = indicators.contains { $0.source == .appleWatch }
-        let diversity = Set(indicators.map(\ .category)).count
-        let base = hasWatchData ? 0.8 : 0.6
-        return min(base + (Double(diversity) * 0.04), 1)
+        let hasWatchData  = indicators.contains { $0.source == .appleWatch }
+        let hasOura       = indicators.contains { $0.source == .oura }
+        let categoryCount = Set(indicators.map(\.category)).count
+        let base = (hasWatchData || hasOura) ? 0.8 : 0.6
+        return min(base + Double(categoryCount) * 0.05, 1.0)
     }
 
-    private func note(for indicators: [SleepIndicator], feeling: SleepFeeling?) -> String {
-        let count = indicators.count
-        let feelingNote = feeling == nil ? "Add a feeling check-in to personalize your score." : ""
-        return "Using \(count) inputs. \(feelingNote)"
+    private func determinePrimarySource(from indicators: [SleepIndicator]) -> SleepIndicatorSource {
+        let counts = Dictionary(grouping: indicators, by: \.source).mapValues(\.count)
+        return counts.max(by: { $0.value < $1.value })?.key ?? .appleHealth
     }
 }

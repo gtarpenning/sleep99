@@ -4,26 +4,19 @@ struct AppRootView: View {
     @Environment(AppContainer.self) private var container
 
     var body: some View {
-        NavigationStack {
-            DashboardView(viewModel: container.dashboardViewModel)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink(value: SettingsDestination.settings) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                    }
-                }
-                .navigationDestination(for: SettingsDestination.self) { destination in
-                    switch destination {
-                    case .settings:
-                        SettingsView(viewModel: container.settingsViewModel)
-                    case .tunedWeights:
-                        TunedWeightsView(viewModel: container.settingsViewModel)
-                    }
-                }
+        TabView {
+            SleepDashboardView(viewModel: container.dashboardViewModel)
+                .tabItem { Label("Sleep", systemImage: "moon.fill") }
+
+            FamilyFeedView(viewModel: container.familyFeedViewModel)
+                .tabItem { Label("Family", systemImage: "person.2.fill") }
+
+            NavigationStack {
+                SettingsView(viewModel: container.settingsViewModel)
+            }
+            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
         }
-        .task {
-            container.scheduleBackgroundSync()
-        }
+        .tint(DS.purple)
+        .colorScheme(.dark)
     }
 }

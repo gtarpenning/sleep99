@@ -36,29 +36,28 @@ private var HealthReadTypes: Set<HKObjectType> {
 
 @MainActor
 @Observable
-final class HealthKitClient {
+class HealthKitClient {
     private let healthStore = HKHealthStore()
     private let calendar = Calendar.current
+
+    // HealthKit intentionally never exposes read permission status to apps.
+    // authorizationStatus(for:) only reflects write/share access, which we
+    // never request. We track whether the user has gone through the prompt
+    // ourselves via UserDefaults.
+    private static let authGrantedKey = "healthkit_auth_granted"
 
     func requestAuthorization() async throws {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         try await healthStore.requestAuthorization(toShare: [], read: HealthReadTypes)
+        // If we get here without throwing, the prompt was shown (user may have
+        // allowed some or all types — HealthKit won't say which, and that's fine).
+        UserDefaults.standard.set(true, forKey: Self.authGrantedKey)
     }
 
     func authorizationState() async -> HealthAuthorizationState {
         guard HKHealthStore.isHealthDataAvailable() else { return .unavailable }
-        guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return .needsPermission }
-        let status = healthStore.authorizationStatus(for: sleepType)
-        switch status {
-        case .notDetermined:
-            return .needsPermission
-        case .sharingDenied:
-            return .denied
-        case .sharingAuthorized:
-            return .authorized
-        @unknown default:
-            return .needsPermission
-        }
+        let granted = UserDefaults.standard.bool(forKey: Self.authGrantedKey)
+        return granted ? .authorized : .needsPermission
     }
 
     func fetchSignals(for date: Date) async throws -> [SleepSignalSample] {
@@ -86,7 +85,7 @@ final class HealthKitClient {
             let samples: [HKQuantitySample] = try await fetchSamples(
                 type: type,
                 predicate: predicate,
-                limit: 200,
+                limit: HKObjectQueryNoLimit,
                 sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             )
             let mapped = samples.map { sample in
@@ -153,7 +152,16 @@ final class HealthKitClient {
         var indicators: [SleepIndicator] = []
         indicators.append(contentsOf: buildSleepIndicators(from: sleepSamples))
 
-        indicators.append(contentsOf: await buildRecoveryIndicators(predicate: sleepPredicate))
+        let sleepStart    = sleepSamples.map(\.startDate).min()
+        let sleepEnd      = sleepSamples.map(\.endDate).max()
+        let sleepDuration = (sleepStart != nil && sleepEnd != nil)
+            ? sleepEnd!.timeIntervalSince(sleepStart!) : 0
+
+        indicators.append(contentsOf: await buildRecoveryIndicators(
+            predicate: sleepPredicate,
+            sleepStart: sleepStart,
+            sleepDuration: sleepDuration
+        ))
         indicators.append(contentsOf: await buildActivityIndicators(predicate: dayPredicate))
         indicators.append(contentsOf: await buildWorkoutIndicators(predicate: dayPredicate))
 
@@ -347,7 +355,17 @@ private extension HealthKitClient {
         }
 
         let hoursAsleep = asleep / 3600
-        let hoursInBed = inBed / 3600
+
+        // Apple Watch never writes inBed samples — derive session span instead.
+        // Session span = first sample start → last sample end (covers asleep + awake segments).
+        let sessionInBed: TimeInterval = {
+            if inBed > 0 { return inBed }
+            let allStarts = samples.map(\.startDate)
+            let allEnds   = samples.map(\.endDate)
+            guard let earliest = allStarts.min(), let latest = allEnds.max() else { return 0 }
+            return latest.timeIntervalSince(earliest)
+        }()
+        let hoursInBed = sessionInBed / 3600
         let efficiency = hoursInBed > 0 ? (hoursAsleep / hoursInBed) : 0
         let remPercent = asleep > 0 ? (rem / asleep) * 100 : 0
         let deepPercent = asleep > 0 ? (deep / asleep) * 100 : 0
@@ -361,7 +379,7 @@ private extension HealthKitClient {
                 unit: "hr",
                 category: .sleepArchitecture,
                 source: .appleHealth,
-                range: 5...9
+                range: 4...8  // 8h = perfect score
             ),
             SleepIndicator(
                 name: "Time in Bed",
@@ -426,7 +444,8 @@ private extension HealthKitClient {
                 value: sleepLatencyMinutes,
                 unit: "min",
                 category: .sleepArchitecture,
-                source: .appleHealth
+                source: .appleHealth,
+                range: 0...45  // <10 min = great after inversion, >45 min = 0
             ))
         }
 
@@ -459,70 +478,60 @@ private extension HealthKitClient {
         return asleep / 3600
     }
 
-    func buildRecoveryIndicators(predicate: NSPredicate) async -> [SleepIndicator] {
-        let restingHeartRate = await fetchAverage(
-            for: .restingHeartRate,
-            predicate: predicate,
-            unit: .count().unitDivided(by: .minute())
-        )
-        let heartRate = await fetchAverage(
-            for: .heartRate,
-            predicate: predicate,
-            unit: .count().unitDivided(by: .minute())
-        )
-        let hrv = await fetchAverage(
-            for: .heartRateVariabilitySDNN,
-            predicate: predicate,
-            unit: .secondUnit(with: .milli)
-        )
-        let respiratory = await fetchAverage(
-            for: .respiratoryRate,
-            predicate: predicate,
-            unit: .count().unitDivided(by: .minute())
-        )
-        let oxygen = await fetchAverage(
-            for: .oxygenSaturation,
-            predicate: predicate,
-            unit: .percent()
-        )
-        let wristTemp = await fetchAverage(
-            for: .appleSleepingWristTemperature,
-            predicate: predicate,
-            unit: .degreeCelsius()
-        )
-        let bodyTemp = await fetchAverage(
-            for: .bodyTemperature,
-            predicate: predicate,
-            unit: .degreeCelsius()
-        )
+    func buildRecoveryIndicators(
+        predicate: NSPredicate,
+        sleepStart: Date?,
+        sleepDuration: TimeInterval
+    ) async -> [SleepIndicator] {
+        let hrUnit = HKUnit.count().unitDivided(by: .minute())
+
+        async let lowestHRStats = fetchMin(for: .heartRate, predicate: predicate, unit: hrUnit)
+        async let hrv       = fetchAverage(for: .heartRateVariabilitySDNN, predicate: predicate, unit: .secondUnit(with: .milli))
+        async let respiratory = fetchAverage(for: .respiratoryRate, predicate: predicate, unit: hrUnit)
+        async let oxygen    = fetchAverage(for: .oxygenSaturation, predicate: predicate, unit: .percent())
+        async let wristTemp = fetchAverage(for: .appleSleepingWristTemperature, predicate: predicate, unit: .degreeCelsius())
+
+        // Time to lowest HR — needs raw samples
+        let timeToLowestFraction: Double? = await {
+            guard let start = sleepStart, sleepDuration > 0 else { return nil }
+            guard let type = HKObjectType.quantityType(forIdentifier: .heartRate) else { return nil }
+            let samples: [HKQuantitySample] = (try? await fetchSamples(
+                type: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            )) ?? []
+            guard let minSample = samples.min(by: { $0.quantity.doubleValue(for: hrUnit) < $1.quantity.doubleValue(for: hrUnit) }) else { return nil }
+            return min(max(minSample.startDate.timeIntervalSince(start) / sleepDuration, 0), 1)
+        }()
 
         var indicators: [SleepIndicator] = []
 
-        if let value = restingHeartRate {
+        if let value = await lowestHRStats {
             indicators.append(SleepIndicator(
-                name: "Resting Heart Rate",
-                detail: "Lower is better",
+                name: "Lowest Overnight HR",
+                detail: "Minimum HR during sleep",
                 value: value,
                 unit: "bpm",
                 category: .recovery,
                 source: .appleWatch,
-                range: 45...70
+                range: 40...70  // used as fallback when no monthly avg
             ))
         }
 
-        if let value = heartRate {
+        if let fraction = timeToLowestFraction {
             indicators.append(SleepIndicator(
-                name: "Overnight Heart Rate",
-                detail: "Average during sleep",
-                value: value,
-                unit: "bpm",
+                name: "Time to Lowest HR",
+                detail: "How early in sleep HR bottomed out",
+                value: fraction,
+                unit: "fraction",
                 category: .recovery,
                 source: .appleWatch,
-                range: 45...75
+                range: 0...1  // lower = earlier = better (inverted in engine)
             ))
         }
 
-        if let value = hrv {
+        if let value = await hrv {
             indicators.append(SleepIndicator(
                 name: "HRV",
                 detail: "Recovery signal",
@@ -530,11 +539,11 @@ private extension HealthKitClient {
                 unit: "ms",
                 category: .recovery,
                 source: .appleWatch,
-                range: 25...90
+                range: 20...90
             ))
         }
 
-        if let value = respiratory {
+        if let value = await respiratory {
             indicators.append(SleepIndicator(
                 name: "Respiratory Rate",
                 detail: "Breathing rate",
@@ -546,7 +555,7 @@ private extension HealthKitClient {
             ))
         }
 
-        if let value = oxygen {
+        if let value = await oxygen {
             indicators.append(SleepIndicator(
                 name: "Blood Oxygen",
                 detail: "Average saturation",
@@ -558,7 +567,7 @@ private extension HealthKitClient {
             ))
         }
 
-        if let value = wristTemp {
+        if let value = await wristTemp {
             indicators.append(SleepIndicator(
                 name: "Wrist Temperature",
                 detail: "Overnight baseline",
@@ -567,18 +576,6 @@ private extension HealthKitClient {
                 category: .recovery,
                 source: .appleWatch,
                 range: 33...36
-            ))
-        }
-
-        if let value = bodyTemp {
-            indicators.append(SleepIndicator(
-                name: "Body Temperature",
-                detail: "Overnight average",
-                value: value,
-                unit: "°C",
-                category: .recovery,
-                source: .appleHealth,
-                range: 35.5...37.5
             ))
         }
 
@@ -725,6 +722,18 @@ private extension HealthKitClient {
                 range: 0...1200
             )
         ]
+    }
+
+    func fetchMin(
+        for identifier: HKQuantityTypeIdentifier,
+        predicate: NSPredicate,
+        unit: HKUnit
+    ) async -> Double? {
+        let type = HKObjectType.quantityType(forIdentifier: identifier)
+        guard let stats = try? await fetchStatistics(type: type, predicate: predicate, options: .discreteMin),
+              let quantity = stats.minimumQuantity()
+        else { return nil }
+        return quantity.doubleValue(for: unit)
     }
 
     func fetchAverage(
