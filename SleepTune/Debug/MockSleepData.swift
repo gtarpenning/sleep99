@@ -23,6 +23,10 @@ enum MockSleepData {
     // Core:  ~183 min  |  Deep: ~85 min  |  REM: ~115 min  |  Awake: ~10 min
 
     static let stages: [SleepStageSample] = [
+        // Simulates a third-party app (e.g. AutoSleep) writing a wide inBed record
+        // spanning the whole day — this is what causes 24h HR on real devices.
+        .init(stage: .inBed,      startDate: t(-840), endDate: t(435)), // 2pm → 7:15am
+
         .init(stage: .inBed,      startDate: t(0),   endDate: t(18)),   // latency 18 min
         .init(stage: .asleepCore, startDate: t(18),  endDate: t(45)),   // 27 min
         .init(stage: .asleepDeep, startDate: t(45),  endDate: t(95)),   // 50 min
@@ -90,6 +94,21 @@ enum MockSleepData {
 
     static let signals: [SleepSignalSample] = {
         var out: [SleepSignalSample] = []
+
+        // Daytime HR — Apple Watch records HR passively all day.
+        // t(-840) = 2pm, t(-30) = 10:30pm. Values are awake/active range (65–95 bpm).
+        // This is what causes 24h HR on real devices when clipping is broken.
+        let daytimeHR: [(Double, Double)] = [
+            (-840,78),(-780,82),(-720,75),(-660,88),(-600,72),(-540,95),
+            (-480,85),(-420,79),(-360,71),(-300,74),(-240,80),(-180,77),
+            (-120,73),(-60,70),(-30,65)
+        ]
+        for (min, bpm) in daytimeHR {
+            out.append(SleepSignalSample(name: SleepSignalType.heartRate.rawValue,
+                                         value: bpm, unit: "bpm", date: t(min), source: .appleWatch))
+        }
+
+        // Sleep HR/HRV/RR
         for p in heartRateSeries.points {
             out.append(SleepSignalSample(name: SleepSignalType.heartRate.rawValue,
                                          value: p.value, unit: "bpm", date: p.date, source: .appleWatch))
@@ -148,6 +167,18 @@ enum MockSleepData {
                        unit: "min", category: .sleepArchitecture, source: .appleWatch,
                        range: 60...240),
 
+        SleepIndicator(name: "Bedtime Consistency",
+                       detail: "Time you fell asleep",
+                       value: 11.0,            // 11 PM = 11.0 hours from noon
+                       unit: "bedtime", category: .sleepArchitecture, source: .appleHealth,
+                       range: 8...14),
+
+        SleepIndicator(name: "Long Awakenings",
+                       detail: "Awake periods 10+ min · 0 = perfect",
+                       value: 0,
+                       unit: "x", category: .sleepArchitecture, source: .appleHealth,
+                       range: 0...3),
+
         // ── Recovery ──────────────────────────────────────────────────────────
         SleepIndicator(name: "Lowest Overnight HR",
                        detail: "Minimum HR during sleep",
@@ -191,6 +222,8 @@ enum MockSleepData {
 
     static let monthlyStats: [String: MetricStats] = [
         "Sleep Duration":       .init(avg: 7.0,  min: 5.2,  max: 8.6,  count: 28),
+        "Bedtime Consistency":  .init(avg: 11.0, min: 9.5,  max: 13.5, count: 28),
+        "Long Awakenings":      .init(avg: 0.5,  min: 0,    max: 3,    count: 28),
         "Sleep Efficiency":     .init(avg: 88,   min: 74,   max: 97,   count: 28),
         "Sleep Latency":        .init(avg: 15,   min: 4,    max: 44,   count: 26),
         "REM Sleep":            .init(avg: 108,  min: 68,   max: 145,  count: 28),

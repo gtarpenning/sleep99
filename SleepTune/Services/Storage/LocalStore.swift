@@ -25,9 +25,24 @@ final class InMemorySleepStore: SleepLocalStore {
 
 @MainActor
 final class UserDefaultsSleepStore: SleepLocalStore {
+    // Bump this when the indicator schema changes (names, units, added/removed fields).
+    // Old indicator cache is automatically cleared on next launch.
+    private static let currentSchemaVersion = 6
+    private let schemaVersionKey = "indicatorSchemaVersion"
+
     private let defaults = UserDefaults.standard
     private let encoder  = JSONEncoder()
     private let decoder  = JSONDecoder()
+
+    init() {
+        if defaults.integer(forKey: schemaVersionKey) != Self.currentSchemaVersion {
+            // Clear all cached indicators (keyed by "indicators_<date>")
+            defaults.dictionaryRepresentation().keys
+                .filter { $0.hasPrefix("indicators_") }
+                .forEach { defaults.removeObject(forKey: $0) }
+            defaults.set(Self.currentSchemaVersion, forKey: schemaVersionKey)
+        }
+    }
 
     // MARK: - Indicators
 

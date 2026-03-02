@@ -106,9 +106,18 @@ struct SleepStagesOverlayChartView: View {
     }
 
     private func xDomain(for overlaySeries: [SleepChartSeries]) -> ClosedRange<Date>? {
-        let allDates = stages.flatMap { [$0.startDate, $0.endDate] }
-            + overlaySeries.flatMap { $0.points.map(\.date) }
-        guard let min = allDates.min(), let max = allDates.max() else { return nil }
+        // Derive bounds from signal data (already clipped to sleep window by the VM).
+        // Do NOT use stage.startDate/endDate — a wide inBed record from a third-party
+        // app (e.g. AutoSleep) can span 2pm → 7am, pulling the X-axis back to afternoon.
+        let signalDates = overlaySeries.flatMap { $0.points.map(\.date) }
+        if let min = signalDates.min(), let max = signalDates.max() {
+            return min...max
+        }
+        // No signals active — use asleep-only stage bounds as fallback.
+        let asleepDates = stages
+            .filter { $0.stage != .inBed && $0.stage != .awake }
+            .flatMap { [$0.startDate, $0.endDate] }
+        guard let min = asleepDates.min(), let max = asleepDates.max() else { return nil }
         return min...max
     }
 

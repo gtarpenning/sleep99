@@ -54,7 +54,11 @@
 		A9CF1742761DF17AD41C828A /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263D00C1D4FA9142A01573C2 /* AppContainer.swift */; };
 		AC789AEC9C132959FFB22944 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97A23EF9AF36225E44BC6F5E /* HealthKit.framework */; };
 		AE6C7263BFC18D517B321DA4 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0998A5B022DE0E3B35BA5745 /* SettingsViewModel.swift */; };
+		AE6C7263BFC18D517B321DB5 /* EmojiPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37265AD53A2FA08E7398B711 /* EmojiPickerView.swift */; };
 		AFB7538AF5D3F46022E2D7D7 /* DopplerStripeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DF06D15A443D5C07C933D5 /* DopplerStripeView.swift */; };
+		BB11223344556677889900BB /* MetricDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900AA /* MetricDefinition.swift */; };
+		BB11223344556677889900DD /* MetricStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900CC /* MetricStats.swift */; };
+		BB11223344556677889900FF /* MetricDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900EE /* MetricDetailSheet.swift */; };
 		BD0EBD7E2097200A75686975 /* DailySleepScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14B87C6A1304A329996FB056 /* DailySleepScore.swift */; };
 		BFD6B086303A538F1AA96346 /* SleepDataAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FC625601AD8E142789A45A /* SleepDataAggregator.swift */; };
 		C092CB7B3F4507729E55F351 /* HealthAccessFullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31260ECD210A48EAAC4477BA /* HealthAccessFullScreenView.swift */; };
@@ -66,9 +70,6 @@
 		D88531F1FEAE6DBCD5768F20 /* SignalOverlayChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286056DD7A153ABA9A613BC8 /* SignalOverlayChartView.swift */; };
 		E20F30C0BC78B8430CADF2DC /* SleepScoreEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8E63173E63ED2B36D0DF07 /* SleepScoreEngineTests.swift */; };
 		E2FF77710250CB8B1AE18A7C /* MetricProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C45927DB747AB48BE8B68B4 /* MetricProfiles.swift */; };
-		BB11223344556677889900BB /* MetricDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900AA /* MetricDefinition.swift */; };
-		BB11223344556677889900DD /* MetricStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900CC /* MetricStats.swift */; };
-		BB11223344556677889900FF /* MetricDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900EE /* MetricDetailSheet.swift */; };
 		E3901DADA81D1E9642CC2F4F /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DA7B090374DFCA980C193D8 /* LocalStore.swift */; };
 		E53D51EC1BE4186F129261C3 /* FamilyFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE8A6BAAB15BE1E42BBDC05B /* FamilyFeedViewModel.swift */; };
 		F02243E16E778E5302072B1B /* SleepInsightImpact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAF86945DB5CAE0340CA5D7 /* SleepInsightImpact.swift */; };
@@ -107,6 +108,7 @@
 		33FC2B39B2A9FFFA285DC022 /* SettingsDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDestination.swift; sourceTree = "<group>"; };
 		3686CA7D06F4336A60B5C2FD /* CloudKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudKitService.swift; sourceTree = "<group>"; };
 		37265AD53A2FA08E7398B710 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		37265AD53A2FA08E7398B711 /* EmojiPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiPickerView.swift; sourceTree = "<group>"; };
 		3914CA082CAEE7790154BD2C /* SleepSignalType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepSignalType.swift; sourceTree = "<group>"; };
 		3A1D144D13045D163472557D /* SleepChartPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepChartPoint.swift; sourceTree = "<group>"; };
 		3B0BEA375C89E5F2BE91D408 /* FamilyMemberDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberDashboardView.swift; sourceTree = "<group>"; };
@@ -129,9 +131,6 @@
 		78645C83E18BC9A05C9CD504 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		7C45927DB747AB48BE8B68B4 /* MetricProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricProfiles.swift; sourceTree = "<group>"; };
 		7D1C1BAB065C9810674F9E76 /* MetricBreakdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricBreakdownView.swift; sourceTree = "<group>"; };
-		AA11223344556677889900AA /* MetricDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDefinition.swift; sourceTree = "<group>"; };
-		AA11223344556677889900CC /* MetricStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricStats.swift; sourceTree = "<group>"; };
-		AA11223344556677889900EE /* MetricDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDetailSheet.swift; sourceTree = "<group>"; };
 		8786ABA5F00FF07C456D21DE /* FamilyMemberRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberRowView.swift; sourceTree = "<group>"; };
 		8BDA9CEDC6CFF22673A43A1C /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		8CD9720D94C51F97181A3785 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -142,6 +141,9 @@
 		9DD500F9A1F934A8F0505CCD /* SleepStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStage.swift; sourceTree = "<group>"; };
 		9F77DCEEE7A4C1018EAA00B2 /* SleepScoreEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScoreEngine.swift; sourceTree = "<group>"; };
 		A44F49BD45CED823FA3662BC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AA11223344556677889900AA /* MetricDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDefinition.swift; sourceTree = "<group>"; };
+		AA11223344556677889900CC /* MetricStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricStats.swift; sourceTree = "<group>"; };
+		AA11223344556677889900EE /* MetricDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDetailSheet.swift; sourceTree = "<group>"; };
 		AC787B726C617AFEA020ECBE /* SleepDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDashboardView.swift; sourceTree = "<group>"; };
 		AD8C81117A3269261D1F10DE /* MockSleepData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockSleepData.swift; sourceTree = "<group>"; };
 		B915CE8D651628EEEB852088 /* SleepIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepIndicator.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 				FB04AEE5F02D9F277FF72AE0 /* HealthConnectionRowView.swift */,
 				37265AD53A2FA08E7398B710 /* SettingsView.swift */,
 				0998A5B022DE0E3B35BA5745 /* SettingsViewModel.swift */,
+				37265AD53A2FA08E7398B711 /* EmojiPickerView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -564,6 +567,7 @@
 				4E3D57802C83F3D10688F3AC /* SettingsDestination.swift in Sources */,
 				F26A5118AC4F133D6CCC1374 /* SettingsView.swift in Sources */,
 				AE6C7263BFC18D517B321DA4 /* SettingsViewModel.swift in Sources */,
+				AE6C7263BFC18D517B321DB5 /* EmojiPickerView.swift in Sources */,
 				D1417F182013D99ACDBBBB97 /* SignInView.swift in Sources */,
 				D88531F1FEAE6DBCD5768F20 /* SignalOverlayChartView.swift in Sources */,
 				02BFF4B79462803F80E6F6C7 /* SleepChartPoint.swift in Sources */,

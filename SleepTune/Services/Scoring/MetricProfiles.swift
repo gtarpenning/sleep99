@@ -13,6 +13,14 @@ enum ScoringShape {
     /// Personal-average baseline. Score = 1 at monthlyAvg, falls off by
     /// `tolerance` units on either side. Falls back to `fallback` with no history.
     case personalAverage(tolerance: Double, fallback: Double = 0.5)
+
+    /// Personal-average with a flat perfect zone. Score = 1 within `deadband` of monthlyAvg,
+    /// then linear decay to 0 at `hardMax` away. Falls back to `fallback` with no history.
+    case personalAverageDeadband(deadband: Double, hardMax: Double, fallback: Double = 0.5)
+
+    /// Lower-than-personal-average is perfect. Score = 1 when value ≤ monthlyAvg,
+    /// decays linearly to 0 at monthlyAvg + hardMaxDelta. Falls back to `fallback` with no history.
+    case lowerIsBetterRelative(hardMaxDelta: Double, fallback: Double = 0.5)
 }
 
 // MARK: - Scoring function
@@ -41,5 +49,19 @@ func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
         guard let avg = monthlyAvg else { return fallback }
         guard tolerance > 0 else { return 1 }
         return max(0, 1 - abs(value - avg) / tolerance)
+
+    case .personalAverageDeadband(let deadband, let hardMax, let fallback):
+        guard let avg = monthlyAvg else { return fallback }
+        let delta = abs(value - avg)
+        if delta <= deadband { return 1 }
+        let decaySpan = hardMax - deadband
+        guard decaySpan > 0 else { return 0 }
+        return max(0, 1 - (delta - deadband) / decaySpan)
+
+    case .lowerIsBetterRelative(let hardMaxDelta, let fallback):
+        guard let avg = monthlyAvg else { return fallback }
+        if value <= avg { return 1 }
+        guard hardMaxDelta > 0 else { return 0 }
+        return max(0, 1 - (value - avg) / hardMaxDelta)
     }
 }

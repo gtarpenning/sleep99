@@ -4,21 +4,17 @@ import SwiftUI
 // MARK: - Chart series identifier
 
 private enum TrendSeries: String, Plottable {
-    case overall  = "Overall"
     case sleep    = "Sleep"
     case recovery = "Recovery"
 
     var color: Color {
         switch self {
-        case .overall:  return DS.purple
         case .sleep:    return DS.sleepArc
         case .recovery: return DS.recoveryArc
         }
     }
 
-    var lineWidth: CGFloat {
-        self == .overall ? 2.5 : 1.5
-    }
+    var lineWidth: CGFloat { 2.0 }
 }
 
 // MARK: - Flat row for Swift Charts
@@ -37,15 +33,9 @@ struct ScoreTrendsSectionView: View {
 
     private var rows: [TrendRow] {
         viewModel.scoreHistory.flatMap { point -> [TrendRow] in
-            var out: [TrendRow] = [
-                TrendRow(date: point.date, score: point.score, series: .overall)
-            ]
-            if let s = point.sleepScore {
-                out.append(TrendRow(date: point.date, score: s, series: .sleep))
-            }
-            if let r = point.recoveryScore {
-                out.append(TrendRow(date: point.date, score: r, series: .recovery))
-            }
+            var out: [TrendRow] = []
+            if let s = point.sleepScore    { out.append(TrendRow(date: point.date, score: s, series: .sleep)) }
+            if let r = point.recoveryScore { out.append(TrendRow(date: point.date, score: r, series: .recovery)) }
             return out
         }
     }
@@ -94,21 +84,6 @@ struct ScoreTrendsSectionView: View {
             .foregroundStyle(row.series.color)
             .lineStyle(StrokeStyle(lineWidth: row.series.lineWidth))
 
-            // Subtle area fill only on overall
-            if row.series == .overall {
-                AreaMark(
-                    x: .value("Date", row.date),
-                    y: .value("Score", row.score)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [DS.purple.opacity(0.18), .clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            }
         }
         .chartYScale(domain: 0...100)
         .chartXAxis(.hidden)
@@ -133,11 +108,11 @@ struct ScoreTrendsSectionView: View {
 
     private var legend: some View {
         HStack(spacing: 16) {
-            ForEach([TrendSeries.overall, .sleep, .recovery], id: \.self) { series in
+            ForEach([TrendSeries.sleep, .recovery], id: \.self) { series in
                 HStack(spacing: 5) {
                     RoundedRectangle(cornerRadius: 1)
                         .fill(series.color)
-                        .frame(width: 16, height: series == .overall ? 2.5 : 1.5)
+                        .frame(width: 16, height: 2)
                     Text(series.rawValue)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(DS.textSecondary)

@@ -7,11 +7,18 @@ import Observation
 final class AuthService {
     var userID: String?
     var displayName: String?
+    var avatarEmoji: String?
     var isSignedIn: Bool { userID != nil }
 
     init() {
         userID = KeychainItem.currentUserID
         displayName = UserDefaults.standard.string(forKey: "auth.displayName")
+        avatarEmoji = UserDefaults.standard.string(forKey: "auth.avatarEmoji")
+    }
+
+    func setAvatarEmoji(_ emoji: String) {
+        avatarEmoji = emoji
+        UserDefaults.standard.set(emoji, forKey: "auth.avatarEmoji")
     }
 
     // MARK: - Session restore (call on launch)

@@ -62,11 +62,38 @@ class HealthKitClient {
 
     func fetchSignals(for date: Date) async throws -> [SleepSignalSample] {
         let sleepWindow = sleepInterval(for: date)
-        let predicate = HKQuery.predicateForSamples(
+        let broadPredicate = HKQuery.predicateForSamples(
             withStart: sleepWindow.start,
             end: sleepWindow.end,
             options: [.strictStartDate, .strictEndDate]
         )
+
+        // Narrow vitals to the actual sleep period (asleep samples only) so daytime
+        // HR doesn't bleed into the "Last Night" chart.
+        let sleepSamples: [HKCategorySample] = (try? await fetchSamples(
+            type: HKObjectType.categoryType(forIdentifier: .sleepAnalysis),
+            predicate: broadPredicate,
+            limit: HKObjectQueryNoLimit,
+            sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        )) ?? []
+        let asleepValues: Set<Int32> = [
+            Int32(HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue),
+            Int32(HKCategoryValueSleepAnalysis.asleepREM.rawValue),
+            Int32(HKCategoryValueSleepAnalysis.asleepCore.rawValue),
+            Int32(HKCategoryValueSleepAnalysis.asleepDeep.rawValue),
+        ]
+        let asleepOnly = sleepSamples.filter { asleepValues.contains(Int32($0.value)) }
+        // Use ONLY asleep samples for the HR window — inBed can start hours before actual sleep.
+        // Fall back to broadPredicate only if there are literally no asleep records at all.
+        let sleepStart = asleepOnly.map(\.startDate).min()
+        let sleepEnd   = asleepOnly.map(\.endDate).max()
+
+        let predicate: NSPredicate
+        if let start = sleepStart, let end = sleepEnd {
+            predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [.strictStartDate, .strictEndDate])
+        } else {
+            predicate = broadPredicate
+        }
 
         let quantityTypes: [(HKQuantityTypeIdentifier, HKUnit, String)] = [
             (.heartRate, .count().unitDivided(by: .minute()), "bpm"),
@@ -152,23 +179,25 @@ class HealthKitClient {
         var indicators: [SleepIndicator] = []
         indicators.append(contentsOf: buildSleepIndicators(from: sleepSamples))
 
-        // Use the first/last asleep sample (not inBed) as the sleep window for
-        // recovery metrics so Time to Lowest HR is relative to actual sleep, not lying in bed.
+        // Narrow to primary session first — same filter used by buildSleepIndicators —
+        // so sleepStart/sleepEnd reflect the real sleep window, not the full 20h query span.
+        let primarySamples = filteredToPrimarySession(sleepSamples)
         let asleepValues: Set<Int32> = [
             Int32(HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue),
             Int32(HKCategoryValueSleepAnalysis.asleepREM.rawValue),
             Int32(HKCategoryValueSleepAnalysis.asleepCore.rawValue),
             Int32(HKCategoryValueSleepAnalysis.asleepDeep.rawValue),
         ]
-        let asleepOnly = sleepSamples.filter { asleepValues.contains(Int32($0.value)) }
-        let sleepStart    = asleepOnly.map(\.startDate).min() ?? sleepSamples.map(\.startDate).min()
-        let sleepEnd      = asleepOnly.map(\.endDate).max()   ?? sleepSamples.map(\.endDate).max()
+        let asleepOnly = primarySamples.filter { asleepValues.contains(Int32($0.value)) }
+        let sleepStart    = asleepOnly.map(\.startDate).min() ?? primarySamples.map(\.startDate).min()
+        let sleepEnd      = asleepOnly.map(\.endDate).max()   ?? primarySamples.map(\.endDate).max()
         let sleepDuration = (sleepStart != nil && sleepEnd != nil)
             ? sleepEnd!.timeIntervalSince(sleepStart!) : 0
 
         indicators.append(contentsOf: await buildRecoveryIndicators(
             predicate: sleepPredicate,
             sleepStart: sleepStart,
+            sleepEnd: sleepEnd,
             sleepDuration: sleepDuration
         ))
         indicators.append(contentsOf: await buildActivityIndicators(predicate: dayPredicate))
@@ -253,6 +282,41 @@ private extension HealthKitClient {
         return DateInterval(start: startOfDay, end: end)
     }
 
+    /// Returns samples belonging only to the primary sleep session —
+    /// the longest contiguous block of asleep samples with ≤45 min gaps.
+    /// inBed and awake samples that overlap the chosen window are included.
+    private func filteredToPrimarySession(_ samples: [HKCategorySample]) -> [HKCategorySample] {
+        let asleepValues: Set<HKCategoryValueSleepAnalysis> = [
+            .asleepUnspecified, .asleepREM, .asleepCore, .asleepDeep
+        ]
+        let asleep = samples
+            .filter { asleepValues.contains(HKCategoryValueSleepAnalysis(rawValue: $0.value) ?? .inBed) }
+            .sorted { $0.startDate < $1.startDate }
+
+        guard !asleep.isEmpty else { return samples }
+
+        let gapTolerance: TimeInterval = 45 * 60
+        var blocks: [DateInterval] = []
+        var blockStart = asleep[0].startDate
+        var blockEnd   = asleep[0].endDate
+
+        for sample in asleep.dropFirst() {
+            if sample.startDate.timeIntervalSince(blockEnd) <= gapTolerance {
+                blockEnd = max(blockEnd, sample.endDate)
+            } else {
+                blocks.append(DateInterval(start: blockStart, end: blockEnd))
+                blockStart = sample.startDate
+                blockEnd   = sample.endDate
+            }
+        }
+        blocks.append(DateInterval(start: blockStart, end: blockEnd))
+
+        guard let primary = blocks.max(by: { $0.duration < $1.duration }) else { return samples }
+
+        // Keep all samples (including inBed/awake) that fall within the primary window.
+        return samples.filter { $0.startDate < primary.end && $0.endDate > primary.start }
+    }
+
     func fetchSamples<T: HKSample>(
         type: HKSampleType?,
         predicate: NSPredicate,
@@ -299,7 +363,11 @@ private extension HealthKitClient {
         }
     }
 
-    func buildSleepIndicators(from samples: [HKCategorySample]) -> [SleepIndicator] {
+    func buildSleepIndicators(from allSamples: [HKCategorySample]) -> [SleepIndicator] {
+        // Narrow to the primary sleep session (longest contiguous asleep block, 45-min gap tolerance).
+        // This prevents summing two nights or a nap from the same 20-hour query window.
+        let samples = filteredToPrimarySession(allSamples)
+
         var inBed: TimeInterval = 0
         var asleep: TimeInterval = 0
         var rem: TimeInterval = 0
@@ -428,15 +496,6 @@ private extension HealthKitClient {
                 source: .appleHealth,
                 range: 60...240
             ),
-            SleepIndicator(
-                name: "Awake Time",
-                detail: "Minutes awake",
-                value: awake / 60,
-                unit: "min",
-                category: .sleepArchitecture,
-                source: .appleHealth,
-                range: 0...90
-            )
         ]
 
         if let sleepLatencyMinutes {
@@ -447,18 +506,36 @@ private extension HealthKitClient {
                 unit: "min",
                 category: .sleepArchitecture,
                 source: .appleHealth,
-                range: 0...45  // <10 min = great after inversion, >45 min = 0
+                range: 0...45
+            ))
+        }
+
+        // Bedtime Consistency — hours from noon so midnight wrap is avoided for 9 PM–2 AM range.
+        if let start = asleepStart {
+            let comps = Calendar.current.dateComponents([.hour, .minute], from: start)
+            let rawHour = Double(comps.hour ?? 0) + Double(comps.minute ?? 0) / 60.0
+            // Shift so values < 12 (morning) are treated as next-day (e.g. 1 AM → 13.0)
+            let hoursFromNoon = rawHour < 12 ? rawHour + 24 - 12 : rawHour - 12
+            indicators.append(SleepIndicator(
+                name: "Bedtime Consistency",
+                detail: "Time you fell asleep",
+                value: hoursFromNoon,
+                unit: "bedtime",
+                category: .sleepArchitecture,
+                source: .appleHealth,
+                range: 8...14  // 8 PM to 2 AM relative to noon
             ))
         }
 
         let longAwakeningCount = Double(longMiddleAwakeSamples.count)
         indicators.append(SleepIndicator(
             name: "Long Awakenings",
-            detail: "Awake periods 10+ min",
+            detail: "Awake periods 10+ min · 0 = perfect",
             value: longAwakeningCount,
             unit: "x",
             category: .sleepArchitecture,
-            source: .appleHealth
+            source: .appleHealth,
+            range: 0...3
         ))
 
         return indicators
@@ -483,12 +560,21 @@ private extension HealthKitClient {
     func buildRecoveryIndicators(
         predicate: NSPredicate,
         sleepStart: Date?,
+        sleepEnd: Date?,
         sleepDuration: TimeInterval
     ) async -> [SleepIndicator] {
         let hrUnit = HKUnit.count().unitDivided(by: .minute())
 
-        async let lowestHRStats = fetchMin(for: .heartRate, predicate: predicate, unit: hrUnit)
-        async let avgHRStats    = fetchAverage(for: .heartRate, predicate: predicate, unit: hrUnit)
+        // Use a tight predicate (sleepStart→sleepEnd) for HR so daytime readings are excluded.
+        let hrPredicate: NSPredicate
+        if let start = sleepStart, let end = sleepEnd {
+            hrPredicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [.strictStartDate, .strictEndDate])
+        } else {
+            hrPredicate = predicate
+        }
+
+        async let lowestHRStats = fetchMin(for: .heartRate, predicate: hrPredicate, unit: hrUnit)
+        async let avgHRStats    = fetchAverage(for: .heartRate, predicate: hrPredicate, unit: hrUnit)
         async let hrv       = fetchAverage(for: .heartRateVariabilitySDNN, predicate: predicate, unit: .secondUnit(with: .milli))
         async let respiratory = fetchAverage(for: .respiratoryRate, predicate: predicate, unit: hrUnit)
         async let oxygen    = fetchAverage(for: .oxygenSaturation, predicate: predicate, unit: .percent())
@@ -500,7 +586,7 @@ private extension HealthKitClient {
             guard let type = HKObjectType.quantityType(forIdentifier: .heartRate) else { return nil }
             let samples: [HKQuantitySample] = (try? await fetchSamples(
                 type: type,
-                predicate: predicate,
+                predicate: hrPredicate,
                 limit: HKObjectQueryNoLimit,
                 sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             )) ?? []

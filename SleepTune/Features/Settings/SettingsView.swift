@@ -2,7 +2,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var viewModel: SettingsViewModel
+    @Environment(AppContainer.self) private var container
     @Environment(\.openURL) private var openURL
+    @State private var showEmojiPicker = false
 
     var body: some View {
         ZStack {
@@ -13,6 +15,18 @@ struct SettingsView: View {
                     NavigationLink(destination: AccountView()) {
                         Label("Account", systemImage: "person.crop.circle")
                             .foregroundStyle(DS.textPrimary)
+                    }
+                    Button {
+                        showEmojiPicker = true
+                    } label: {
+                        HStack {
+                            Label("Profile Emoji", systemImage: "face.smiling")
+                                .foregroundStyle(DS.textPrimary)
+                            Spacer()
+                            Text(container.authService.avatarEmoji ?? "None")
+                                .foregroundStyle(DS.textSecondary)
+                                .font(.body)
+                        }
                     }
                 } header: {
                     Text("Profile")
@@ -54,5 +68,6 @@ struct SettingsView: View {
         .task { await viewModel.refreshHealthAuthorizationState() }
         .navigationTitle("Settings")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .sheet(isPresented: $showEmojiPicker) { EmojiPickerView() }
     }
 }

@@ -161,11 +161,12 @@ final class DashboardViewModel {
 
     // MARK: - Private
 
-    /// Silently fetches and caches the previous 6 days so week navigation is instant.
+    /// Silently fetches and caches the previous 30 days for monthly stats and week navigation.
+    /// Already-cached days are skipped, so subsequent launches are fast.
     private func prefetchWeek() async {
         guard authorizationState == .authorized else { return }
         let today = Date()
-        for offset in 1..<7 {
+        for offset in 1..<30 {
             guard let day = Calendar.current.date(byAdding: .day, value: -offset, to: today) else { continue }
             let cached = await localStore.loadIndicators(for: day)
             guard cached.isEmpty else { continue }
@@ -194,13 +195,18 @@ final class DashboardViewModel {
             .filter { $0.category == .sleepArchitecture }
             .first
             .map { Int($0.value) } ?? 0
-        try? await cloudKitService.publishTodayScore(
-            summary,
-            totalMinutes: totalMinutes,
-            userID: userID,
-            displayName: displayName,
-            avatarColor: "#5E5CE6"
-        )
+        do {
+            try await cloudKitService.publishTodayScore(
+                summary,
+                totalMinutes: totalMinutes,
+                userID: userID,
+                displayName: displayName,
+                avatarColor: "#5E5CE6",
+                avatarEmoji: authService.avatarEmoji
+            )
+        } catch {
+            print("[CloudKit] publishTodayScore failed: \(error)")
+        }
     }
 
     private func refreshLastNightData() async {
@@ -216,27 +222,59 @@ final class DashboardViewModel {
             async let stagesTask = healthKitClient.fetchSleepStages(for: selectedDate)
             async let signalsTask = healthKitClient.fetchSignals(for: selectedDate)
             let (stages, signals) = try await (stagesTask, signalsTask)
-            lastNightStages = stages
 
-            // Clip signals to actual sleep stage window to avoid waking-hour outliers
-            let stageStart = stages.map(\.startDate).min()
-            let stageEnd   = stages.map(\.endDate).max()
-            let clipped: [SleepSignalSample]
-            if let start = stageStart, let end = stageEnd {
-                clipped = signals.filter { $0.date >= start && $0.date <= end }
+            // Find the PRIMARY sleep block — the longest contiguous run of asleep stages.
+            // Using min/max of all asleep records breaks when third-party apps write wide
+            // inBed records or when there are isolated outlier samples outside the main block.
+            if let window = primarySleepWindow(from: stages) {
+                lastNightStages = stages.filter { $0.startDate < window.end && $0.endDate > window.start }
+                let clipped = signals.filter { $0.date >= window.start && $0.date <= window.end }
+                lastNightHeartRateSeries       = makeSignalSeries(from: clipped, type: .heartRate)
+                lastNightHRVSeries             = makeSignalSeries(from: clipped, type: .heartRateVariability)
+                lastNightRespiratoryRateSeries = makeSignalSeries(from: clipped, type: .respiratoryRate)
             } else {
-                clipped = signals
+                lastNightStages = stages
+                lastNightHeartRateSeries       = makeSignalSeries(from: signals, type: .heartRate)
+                lastNightHRVSeries             = makeSignalSeries(from: signals, type: .heartRateVariability)
+                lastNightRespiratoryRateSeries = makeSignalSeries(from: signals, type: .respiratoryRate)
             }
-
-            lastNightHeartRateSeries      = makeSignalSeries(from: clipped, type: .heartRate)
-            lastNightHRVSeries            = makeSignalSeries(from: clipped, type: .heartRateVariability)
-            lastNightRespiratoryRateSeries = makeSignalSeries(from: clipped, type: .respiratoryRate)
         } catch {
             lastNightStages = []
             lastNightHeartRateSeries = nil
             lastNightHRVSeries = nil
             lastNightRespiratoryRateSeries = nil
         }
+    }
+
+    /// Finds the longest contiguous block of asleep stages (ignoring inBed/awake).
+    /// Tolerates gaps up to 45 min between segments (brief awakenings, stage transitions).
+    /// Returns nil only if there are no asleep stages at all.
+    private func primarySleepWindow(from stages: [SleepStageSample]) -> DateInterval? {
+        let asleep = stages
+            .filter { $0.stage != .inBed && $0.stage != .awake }
+            .sorted { $0.startDate < $1.startDate }
+        guard !asleep.isEmpty else { return nil }
+
+        let gapTolerance: TimeInterval = 45 * 60
+
+        // Build contiguous blocks
+        var blocks: [DateInterval] = []
+        var blockStart = asleep[0].startDate
+        var blockEnd   = asleep[0].endDate
+
+        for stage in asleep.dropFirst() {
+            if stage.startDate.timeIntervalSince(blockEnd) <= gapTolerance {
+                blockEnd = max(blockEnd, stage.endDate)
+            } else {
+                blocks.append(DateInterval(start: blockStart, end: blockEnd))
+                blockStart = stage.startDate
+                blockEnd   = stage.endDate
+            }
+        }
+        blocks.append(DateInterval(start: blockStart, end: blockEnd))
+
+        // Return the longest block (most likely the main sleep session)
+        return blocks.max(by: { $0.duration < $1.duration })
     }
 
     private func makeSignalSeries(from signals: [SleepSignalSample], type: SleepSignalType) -> SleepChartSeries? {

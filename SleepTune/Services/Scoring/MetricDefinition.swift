@@ -36,15 +36,20 @@ enum MetricRegistry {
         .init(name: "Sleep Duration",
               category: .sleepArchitecture,
               scoring: .higherIsBetter(hardMin: 4, idealMin: 8),   // hours; 8h = perfect
-              weight: 0.40, lowerIsBetter: false, hint: nil),
+              weight: 0.35, lowerIsBetter: false, hint: nil),
+
+        .init(name: "Long Awakenings",
+              category: .sleepArchitecture,
+              scoring: .lowerIsBetter(idealMax: 0, hardMax: 3),    // 0 = perfect, 3+ = 0
+              weight: 0.05, lowerIsBetter: true,
+              hint: "0 = perfect · each long waking hurts"),
 
         // Average HR during sleep scores in BOTH categories (see recovery entry below).
         // Physiologically it reflects sleep quality (arousal, stress) AND cardiovascular recovery.
         .init(name: "Overnight Heart Rate",
               category: .sleepArchitecture,
               scoring: .lowerIsBetter(idealMax: 50, hardMax: 80),
-              weight: 0.20, lowerIsBetter: true,
-              hint: "average HR during sleep · lower is better"),
+              weight: 0.20, lowerIsBetter: true, hint: nil),
 
         .init(name: "REM Sleep",
               category: .sleepArchitecture,
@@ -55,6 +60,14 @@ enum MetricRegistry {
               category: .sleepArchitecture,
               scoring: .higherIsBetter(hardMin: 10, idealMin: 60), // minutes; personal avg beats 60
               weight: 0.10, lowerIsBetter: false, hint: nil),
+
+        // Bedtime within 30 min of personal average = perfect; 2 hr off = 0.
+        // Value stored as hours-from-noon (e.g. 10 PM = 10.0, midnight = 12.0, 1 AM = 13.0).
+        .init(name: "Bedtime Consistency",
+              category: .sleepArchitecture,
+              scoring: .personalAverageDeadband(deadband: 0.5, hardMax: 2.0), // hours
+              weight: 0.10, lowerIsBetter: false,
+              hint: "+/- 30 min of your usual bedtime is perfect"),
 
         .init(name: "Sleep Efficiency",
               category: .sleepArchitecture,
@@ -85,7 +98,7 @@ enum MetricRegistry {
               category: .recovery,
               scoring: .lowerIsBetter(idealMax: 0.33, hardMax: 1), // perfect in first third; linear decay after
               weight: 0.15, lowerIsBetter: true,
-              hint: "lower is better · first third of night = perfect"),
+              hint: "within the first third of the night is perfect"),
 
         .init(name: "HRV",
               category: .recovery,
@@ -109,14 +122,13 @@ enum MetricRegistry {
         .init(name: "Overnight Heart Rate",
               category: .recovery,
               scoring: .lowerIsBetter(idealMax: 50, hardMax: 80),
-              weight: 0.10, lowerIsBetter: true,
-              hint: "average HR during sleep · lower is better"),
+              weight: 0.10, lowerIsBetter: true, hint: nil),
 
         .init(name: "Wrist Temperature",
               category: .recovery,
-              scoring: .personalAverage(tolerance: 0.5),           // °C deviation from baseline
-              weight: 0.02, lowerIsBetter: false,
-              hint: "deviation from your baseline"),
+              scoring: .lowerIsBetterRelative(hardMaxDelta: 1.0),  // ≤ avg = perfect; avg+1°C = 0
+              weight: 0.02, lowerIsBetter: true,
+              hint: "cooler than your average is better"),
     ]
 
     // MARK: - Lookups

@@ -73,7 +73,9 @@ struct MetricBreakdownView: View {
             .filter { $0.category == category }
             .map(\.name)
         let displayIndicators = indicators.filter { indicator in
-            indicator.category == category || crossListedNames.contains(indicator.name)
+            // Only show metrics that exist in the registry; skip unregistered/junk metrics
+            guard MetricRegistry.all.contains(where: { $0.name == indicator.name }) else { return false }
+            return indicator.category == category || crossListedNames.contains(indicator.name)
         }
         // Deduplicate (shouldn't be needed but guard against double-add)
         var seen = Set<String>()
@@ -135,6 +137,14 @@ func formatted(value: Double, unit: String) -> String {
         return "\(Int(value.rounded())) br/min"
     case "fraction":
         return String(format: "%.2f", value)
+    case "bedtime":
+        // value = hours from noon (10 PM = 10.0, midnight = 12.0, 1 AM = 13.0)
+        let minutesFromMidnight = (Int((value * 60).rounded()) + 12 * 60) % (24 * 60)
+        let h = minutesFromMidnight / 60
+        let m = minutesFromMidnight % 60
+        let ampm = h < 12 ? "AM" : "PM"
+        let displayH = h == 0 ? 12 : h > 12 ? h - 12 : h
+        return String(format: "%d:%02d %@", displayH, m, ampm)
     default:
         return String(format: "%.1f \(unit)", value)
     }
@@ -217,7 +227,7 @@ struct MetricContributionRow: View {
 
     /// Subtitle: show actual 30d average (transparent) + delta tonight; fall back to static hint.
     private var subtitle: (text: String, color: Color)? {
-        if let stats = metric.stats {
+        if let stats = metric.stats, stats.count > 0 {
             let avgText = "avg \(formatted(value: stats.avg, unit: metric.unit))"
             let delta = metric.rawValue - stats.avg
             let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
@@ -238,10 +248,7 @@ struct MetricContributionRow: View {
             default:
                 deltaStr = "\(sign)\(Int(abs(delta).rounded())) \(metric.unit)"
             }
-            // Good if: lowerIsBetter & delta < 0, or !lowerIsBetter & delta > 0
-            let isGood = metric.lowerIsBetter ? delta < 0 : delta > 0
-            let color: Color = isGood ? DS.green : Color(red: 1.0, green: 0.42, blue: 0.42)
-            return ("\(avgText) · \(deltaStr) tonight", color)
+            return ("\(avgText) · \(deltaStr) tonight", DS.textTertiary)
         } else if let hint = metric.hint {
             return (hint, DS.textTertiary)
         }
@@ -250,9 +257,7 @@ struct MetricContributionRow: View {
 
     var body: some View {
         Button {
-            if metric.stats != nil {
-                showDetail = true
-            }
+            showDetail = true
         } label: {
             VStack(spacing: 8) {
                 HStack(alignment: .center, spacing: 10) {

@@ -10,6 +10,12 @@ struct DailySleepScore: Identifiable, Hashable {
     var totalSleepMinutes: Int
     var primarySource: SleepIndicatorSource
 
+    func toSummary() -> SleepScoreSummary {
+        SleepScoreSummary(date: date, score: score, trend: 0,
+                          sleepScore: sleepScore, recoveryScore: recoveryScore,
+                          confidence: 1, primarySource: primarySource)
+    }
+
     var scoreLabel: String {
         switch score {
         case 85...:    return "Excellent"

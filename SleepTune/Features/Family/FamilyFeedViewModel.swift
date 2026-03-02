@@ -1,15 +1,18 @@
 import Foundation
 import Observation
+import CloudKit
 
 @MainActor
 @Observable
 final class FamilyFeedViewModel {
     var members: [FamilyMember] = []
     var scores: [String: DailySleepScore] = [:]
+    var currentUserScore: DailySleepScore?   // set from AppRootView whenever dashboard updates
     var selectedDate: Date = Date()
     var isLoading: Bool = false
-    var shareURL: URL?
     var shareError: String?
+    /// Set before presenting UICloudSharingController
+    var pendingShare: (CKShare, CKContainer)?
 
     private let authService: AuthService
     private let cloudKitService: CloudKitService
@@ -20,7 +23,7 @@ final class FamilyFeedViewModel {
 
         let myID = authService.userID ?? "me"
         let myName = authService.displayName ?? "You"
-        members = [FamilyMember(id: myID, displayName: myName, avatarColor: "#5E5CE6", isCurrentUser: true)]
+        members = [FamilyMember(id: myID, displayName: myName, avatarColor: "#5E5CE6", avatarEmoji: authService.avatarEmoji, isCurrentUser: true)]
     }
 
     func refresh() async {
@@ -33,7 +36,7 @@ final class FamilyFeedViewModel {
             let myName = authService.displayName ?? "You"
 
             var newMembers: [FamilyMember] = [
-                FamilyMember(id: myID, displayName: myName, avatarColor: "#5E5CE6", isCurrentUser: true)
+                FamilyMember(id: myID, displayName: myName, avatarColor: "#5E5CE6", avatarEmoji: authService.avatarEmoji, isCurrentUser: true)
             ]
             var newScores: [String: DailySleepScore] = [:]
 
@@ -50,14 +53,27 @@ final class FamilyFeedViewModel {
     }
 
     func score(for member: FamilyMember) -> DailySleepScore? {
-        scores[member.id]
+        member.isCurrentUser ? currentUserScore : scores[member.id]
     }
 
-    func generateInviteLink() async {
-        guard let userID = authService.userID else { return }
+    func prepareShare() async {
+        guard let userID = authService.userID else {
+            shareError = "Sign in with Apple to create an invite."
+            return
+        }
+        guard let score = currentUserScore else {
+            shareError = "Open the Sleep tab and let your score load first, then try again."
+            return
+        }
         do {
-            guard let recordID = try await cloudKitService.todayRecordID(for: userID) else { return }
-            shareURL = try await cloudKitService.shareScore(recordID: recordID)
+            pendingShare = try await cloudKitService.prepareShare(
+                score.toSummary(),
+                totalMinutes: score.totalSleepMinutes,
+                userID: userID,
+                displayName: authService.displayName ?? "Me",
+                avatarColor: "#5E5CE6",
+                avatarEmoji: authService.avatarEmoji
+            )
         } catch {
             shareError = error.localizedDescription
         }

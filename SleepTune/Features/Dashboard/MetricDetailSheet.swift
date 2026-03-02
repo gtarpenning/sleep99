@@ -158,7 +158,7 @@ struct MetricDetailSheet: View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.system(.title3, design: .rounded, weight: .bold))
-                .foregroundStyle(good ? DS.green : DS.textPrimary)
+                .foregroundStyle(DS.textPrimary)
                 .monospacedDigit()
             Text(label)
                 .font(.system(size: 9, weight: .semibold))

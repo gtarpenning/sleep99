@@ -36,8 +36,11 @@ struct SleepStageChartView: View {
 
     private func resolvedDomain() -> ClosedRange<Date> {
         if let xDomain { return xDomain }
-        guard let min = stages.map(\.startDate).min(),
-              let max = stages.map(\.endDate).max() else {
+        // Fallback: use asleep-only stages so inBed outliers don't expand the axis.
+        let asleep = stages.filter { $0.stage != .inBed && $0.stage != .awake }
+        let source = asleep.isEmpty ? stages : asleep
+        guard let min = source.map(\.startDate).min(),
+              let max = source.map(\.endDate).max() else {
             let now = Date(); return now...now
         }
         return min...max

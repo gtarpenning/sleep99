@@ -30,24 +30,28 @@ struct ScoreBreakdownView: View {
     private static let cardLimit = 4
 
     private func metrics(for category: SleepIndicatorCategory) -> [CardMetric] {
-        let orderedNames = MetricRegistry.scoredMetrics(in: category)
+        // Sort by weight desc (alpha tiebreak), map to available indicators only,
+        // then take the first cardLimit that actually exist.
+        let sorted = MetricRegistry.scoredMetrics(in: category)
             .sorted {
                 if $0.weight != $1.weight { return $0.weight > $1.weight }
                 return $0.name < $1.name
             }
-            .prefix(Self.cardLimit)
-            .map(\.name)
 
-        return orderedNames.compactMap { name in
-            guard let indicator = indicators.first(where: { $0.name == name }) else { return nil }
-            return CardMetric(name: shortName(name), value: formatted(indicator), source: indicator.source)
-        }
+        return sorted
+            .compactMap { def -> CardMetric? in
+                guard let indicator = indicators.first(where: { $0.name == def.name }) else { return nil }
+                return CardMetric(name: shortName(def.name), value: formatted(indicator), source: indicator.source)
+            }
+            .prefix(Self.cardLimit)
+            .map { $0 }
     }
 
     /// Shorter display names for the compact card layout.
     private func shortName(_ name: String) -> String {
         switch name {
         case "Sleep Duration":      return "Duration"
+        case "Bedtime Consistency":  return "Bedtime"
         case "Overnight Heart Rate": return "Avg HR"
         case "Lowest Overnight HR": return "Lowest HR"
         case "Time to Lowest HR":   return "Min HR timing"
@@ -62,6 +66,12 @@ struct ScoreBreakdownView: View {
         case "hr":       return "\(Int(v))h \(Int((v - Double(Int(v))) * 60))m"
         case "min":      return "\(Int(v.rounded()))m"
         case "fraction": return String(format: "%.2f", v)
+        case "bedtime":
+            let minutesFromMidnight = (Int((v * 60).rounded()) + 12 * 60) % (24 * 60)
+            let h = minutesFromMidnight / 60; let m = minutesFromMidnight % 60
+            let ampm = h < 12 ? "AM" : "PM"
+            let displayH = h == 0 ? 12 : h > 12 ? h - 12 : h
+            return String(format: "%d:%02d %@", displayH, m, ampm)
         case "%", "ms", "bpm", "br/min": return "\(Int(v.rounded())) \(i.unit)"
         default:         return String(format: "%.1f \(i.unit)", v)
         }
@@ -131,7 +141,7 @@ struct BreakdownCard: View {
 
         }
         .padding(14)
-        .frame(width: 190)
+        .frame(width: 184)
         .background(DS.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(DS.border, lineWidth: 0.5))
     }

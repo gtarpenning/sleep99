@@ -1,8 +1,9 @@
 import SwiftUI
+import CloudKit
 
 struct FamilyFeedView: View {
     @Bindable var viewModel: FamilyFeedViewModel
-    @State private var showShareSheet = false
+    @State private var showCloudSharing = false
 
     var body: some View {
         NavigationStack {
@@ -11,17 +12,10 @@ struct FamilyFeedView: View {
 
                 List {
                     ForEach(sortedMembers) { member in
-                        NavigationLink {
-                            FamilyMemberDashboardView(
-                                member: member,
-                                score: viewModel.score(for: member)
-                            )
-                        } label: {
-                            FamilyMemberRowView(
-                                member: member,
-                                score: viewModel.score(for: member)
-                            )
-                        }
+                        FamilyMemberRowView(
+                            member: member,
+                            score: viewModel.score(for: member)
+                        )
                         .listRowBackground(DS.surface)
                         .listRowSeparatorTint(DS.border)
                     }
@@ -34,7 +28,7 @@ struct FamilyFeedView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await generateInvite() }
+                        Task { await prepareAndShare() }
                     } label: {
                         Image(systemName: "person.badge.plus")
                             .foregroundStyle(DS.purple)
@@ -44,9 +38,10 @@ struct FamilyFeedView: View {
             .refreshable {
                 await viewModel.refresh()
             }
-            .sheet(isPresented: $showShareSheet) {
-                if let url = viewModel.shareURL {
-                    ShareSheet(activityItems: [url])
+            .sheet(isPresented: $showCloudSharing) {
+                if let (share, container) = viewModel.pendingShare {
+                    CloudSharingView(share: share, container: container)
+                        .ignoresSafeArea()
                 }
             }
             .alert("Could not create invite", isPresented: .init(
@@ -68,22 +63,35 @@ struct FamilyFeedView: View {
         }
     }
 
-    private func generateInvite() async {
-        await viewModel.generateInviteLink()
-        if viewModel.shareURL != nil {
-            showShareSheet = true
+    private func prepareAndShare() async {
+        await viewModel.prepareShare()
+        if viewModel.pendingShare != nil {
+            showCloudSharing = true
         }
     }
 }
 
-// MARK: - UIActivityViewController wrapper
+// MARK: - UICloudSharingController wrapper
 
-private struct ShareSheet: UIViewControllerRepresentable {
-    let activityItems: [Any]
+private struct CloudSharingView: UIViewControllerRepresentable {
+    let share: CKShare
+    let container: CKContainer
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    func makeUIViewController(context: Context) -> UICloudSharingController {
+        let controller = UICloudSharingController(share: share, container: container)
+        controller.availablePermissions = [.allowReadOnly, .allowPrivate]
+        controller.delegate = context.coordinator
+        return controller
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UICloudSharingController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    class Coordinator: NSObject, UICloudSharingControllerDelegate {
+        func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
+            print("[CloudSharing] failed: \(error)")
+        }
+        func itemTitle(for csc: UICloudSharingController) -> String? { "My Sleep Score" }
+    }
 }

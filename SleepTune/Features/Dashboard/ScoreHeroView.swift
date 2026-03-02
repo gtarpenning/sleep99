@@ -50,17 +50,9 @@ struct ScoreHeroView: View {
             dateNavRow
                 .padding(.bottom, 24)
 
-            // Score number with ambient HR glow
+            // Score number
             scoreLabel
                 .padding(.bottom, 20)
-                .background(
-                    RadialGradient(
-                        colors: [hrAmbientColor.opacity(hrGlowOpacity), .clear],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 110
-                    )
-                )
 
             // Doppler Stripe — full width hero
             DopplerStripeView(bins: bins, score: summary.score, height: 36)

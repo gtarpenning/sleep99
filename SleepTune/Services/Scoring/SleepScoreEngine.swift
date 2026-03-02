@@ -14,7 +14,7 @@ struct SleepScoreEngine {
 
         return SleepScoreSummary(
             date: Date(),
-            score:         min(max(overall, 0), 99),
+            score:         min(max(overall.rounded(.up), 0), 99),
             trend:         0,
             sleepScore:    min(max(sleepScore * 100, 0), 99),
             recoveryScore: min(max(recoveryScore * 100, 0), 99),

@@ -9,14 +9,10 @@ struct SignalOverlayChartView: View {
     var body: some View {
         let domain = resolvedDomain()
         Chart {
-            ForEach(series, id: \.title) { series in
-                ForEach(series.points, id: \.date) { point in
-                    LineMark(
-                        x: .value("Time", point.date),
-                        y: .value(series.title, point.value)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(by: .value("Signal", series.title))
+            ForEach(series, id: \.title) { s in
+                let segments = segmented(points: s.points, maxGap: 30 * 60)
+                ForEach(Array(segments.enumerated()), id: \.offset) { _, seg in
+                    segmentMarks(seg: seg, title: s.title)
                 }
             }
 
@@ -109,5 +105,42 @@ struct SignalOverlayChartView: View {
             previous = point
         }
         return last.value
+    }
+
+    /// Splits sorted points into contiguous segments where consecutive gaps ≤ maxGap seconds.
+    private func segmented(points: [SleepChartPoint], maxGap: TimeInterval) -> [[SleepChartPoint]] {
+        let sorted = points.sorted { $0.date < $1.date }
+        guard !sorted.isEmpty else { return [] }
+        var segments: [[SleepChartPoint]] = [[sorted[0]]]
+        for point in sorted.dropFirst() {
+            if point.date.timeIntervalSince(segments[segments.count - 1].last!.date) <= maxGap {
+                segments[segments.count - 1].append(point)
+            } else {
+                segments.append([point])
+            }
+        }
+        return segments
+    }
+
+    @ChartContentBuilder
+    private func segmentMarks(seg: [SleepChartPoint], title: String) -> some ChartContent {
+        if seg.count == 1 {
+            PointMark(
+                x: .value("Time", seg[0].date),
+                y: .value(title, seg[0].value)
+            )
+            .symbolSize(30)
+            .foregroundStyle(by: .value("Signal", title))
+        } else {
+            ForEach(seg, id: \.date) { point in
+                LineMark(
+                    x: .value("Time", point.date),
+                    y: .value(title, point.value),
+                    series: .value("Series", title)
+                )
+                .interpolationMethod(.catmullRom)
+                .foregroundStyle(by: .value("Signal", title))
+            }
+        }
     }
 }
