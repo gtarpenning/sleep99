@@ -25,12 +25,18 @@ struct AppRootView: View {
     private func syncCurrentUserScore() {
         let dash = container.dashboardViewModel
         guard dash.summary.score > 0 else { return }
+        let today = Date().startOfDay
+        let selectedDay = dash.selectedDate.startOfDay
+        // Family should reflect the latest nightly value, not whichever historical day
+        // the user is currently browsing on the Sleep tab.
+        guard selectedDay == today else { return }
+
         let totalMinutes = dash.indicators.first(where: { $0.name == "Sleep Duration" })
             .map { Int($0.value * 60) } ?? 0
         container.familyFeedViewModel.currentUserScore = DailySleepScore(
             id: "current-user",
             memberID: container.authService.userID ?? "me",
-            date: dash.selectedDate,
+            date: selectedDay,
             score: dash.summary.score,
             sleepScore: dash.summary.sleepScore,
             recoveryScore: dash.summary.recoveryScore,

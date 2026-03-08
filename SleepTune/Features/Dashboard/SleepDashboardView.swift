@@ -70,7 +70,7 @@ struct SleepDashboardView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
 
-                // Breakdown cards (horizontal scroll)
+                // Breakdown cards
                 ScoreBreakdownView(
                     summary: viewModel.summary,
                     indicators: viewModel.indicators
@@ -80,7 +80,9 @@ struct SleepDashboardView: View {
                 if !viewModel.indicators.isEmpty {
                     MetricBreakdownView(
                         indicators: viewModel.indicators,
-                        monthlyStats: viewModel.monthlyStats
+                        monthlyStats: viewModel.monthlyStats,
+                        sleepScore: viewModel.summary.sleepScore,
+                        recoveryScore: viewModel.summary.recoveryScore
                     )
                     .padding(.horizontal, 20)
                 }

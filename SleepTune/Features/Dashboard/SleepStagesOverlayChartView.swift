@@ -170,7 +170,7 @@ private struct ScrubTooltipView: View {
                     Circle()
                         .fill(signalColor(for: reading.title))
                         .frame(width: 5, height: 5)
-                    Text("\(Int(reading.value.rounded())) \(reading.unit)")
+                    Text(formattedReadingValue(reading))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(DS.textPrimary)
                         .monospacedDigit()
@@ -181,6 +181,13 @@ private struct ScrubTooltipView: View {
         .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(DS.border, lineWidth: 0.5))
+    }
+
+    private func formattedReadingValue(_ reading: SleepSignalReading) -> String {
+        if reading.unit == "br/min" {
+            return "\(reading.value.formatted(.number.precision(.fractionLength(1)))) \(reading.unit)"
+        }
+        return "\(Int(reading.value.rounded())) \(reading.unit)"
     }
 }
 

@@ -1,8 +1,8 @@
 #if DEBUG
 import Foundation
 
-/// Realistic fake sleep data for Previews and on-device mock mode.
-/// Values are derived from the mock stage / signal data below so everything is internally consistent.
+/// Intentionally messy fake sleep data for previews and on-device mock mode.
+/// It includes overlaps, out-of-order entries, and off-window noise to stress session selection logic.
 enum MockSleepData {
 
     // MARK: - Reference night: 11:00 PM → 7:15 AM (435 min session, ~420 min asleep)
@@ -18,18 +18,21 @@ enum MockSleepData {
     }
 
     // MARK: - Sleep stages
-    // Session: 11:00 PM → 7:15 AM
-    // inBed: 18 min latency, then asleep cycles, 15 min in-bed at end
-    // Core:  ~183 min  |  Deep: ~85 min  |  REM: ~115 min  |  Awake: ~10 min
+    // Main session is still around 11:00 PM → 7:15 AM, but data is intentionally messy:
+    // - broad inBed records from third-party apps
+    // - overlapping and duplicated asleep segments
+    // - out-of-order rows
+    // - a short post-wake nap in the same day
 
     static let stages: [SleepStageSample] = [
-        // Simulates a third-party app (e.g. AutoSleep) writing a wide inBed record
-        // spanning the whole day — this is what causes 24h HR on real devices.
-        .init(stage: .inBed,      startDate: t(-840), endDate: t(435)), // 2pm → 7:15am
+        // Third-party broad inBed records
+        .init(stage: .inBed,      startDate: t(-840), endDate: t(435)),
+        .init(stage: .inBed,      startDate: t(-75),  endDate: t(6)),
 
         .init(stage: .inBed,      startDate: t(0),   endDate: t(18)),   // latency 18 min
         .init(stage: .asleepCore, startDate: t(18),  endDate: t(45)),   // 27 min
         .init(stage: .asleepDeep, startDate: t(45),  endDate: t(95)),   // 50 min
+        .init(stage: .asleepCore, startDate: t(90),  endDate: t(121)),  // overlap/dup stream
         .init(stage: .asleepCore, startDate: t(95),  endDate: t(120)),  // 25 min
         .init(stage: .asleepREM,  startDate: t(120), endDate: t(150)),  // 30 min
         .init(stage: .awake,      startDate: t(150), endDate: t(158)),  // 8 min
@@ -39,15 +42,21 @@ enum MockSleepData {
         .init(stage: .asleepREM,  startDate: t(265), endDate: t(310)),  // 45 min
         .init(stage: .asleepCore, startDate: t(310), endDate: t(340)),  // 30 min
         .init(stage: .asleepREM,  startDate: t(340), endDate: t(380)),  // 40 min
+        .init(stage: .awake,      startDate: t(271), endDate: t(273)),  // micro-awake
         .init(stage: .awake,      startDate: t(380), endDate: t(383)),  // 3 min
         .init(stage: .asleepCore, startDate: t(383), endDate: t(420)),  // 37 min (rounds core to ~191)
         .init(stage: .inBed,      startDate: t(420), endDate: t(435)),
+
+        // Out-of-order: short pre-sleep nap in evening.
+        .init(stage: .asleepCore, startDate: t(-240), endDate: t(-205)),
+        .init(stage: .awake,      startDate: t(-205), endDate: t(-198)),
+
+        // Post-wake nap that can contaminate broad windows.
+        .init(stage: .asleepREM,  startDate: t(725), endDate: t(755)),
     ]
-    // Totals: Core ≈ 191 min, Deep ≈ 85 min, REM ≈ 115 min, Awake ≈ 11 min
-    // Asleep = 391 min = 6.52 h, Session = 435 min, Efficiency = 391/420 ≈ 93%
 
     // MARK: - Heart rate signal (bpm, ~5-min intervals)
-    // Dips during deep sleep (cycles 1+2), rises in REM, slightly elevated near wake
+    // Includes realistic overnight signal plus intentional noisy duplicates/outliers.
 
     static let heartRateSeries: SleepChartSeries = {
         let rawValues: [(Double, Double)] = [
@@ -95,15 +104,14 @@ enum MockSleepData {
     static let signals: [SleepSignalSample] = {
         var out: [SleepSignalSample] = []
 
-        // Daytime HR — Apple Watch records HR passively all day.
-        // t(-840) = 2pm, t(-30) = 10:30pm. Values are awake/active range (65–95 bpm).
-        // This is what causes 24h HR on real devices when clipping is broken.
-        let daytimeHR: [(Double, Double)] = [
+        // Daytime / off-session HR.
+        let nonSleepHR: [(Double, Double)] = [
             (-840,78),(-780,82),(-720,75),(-660,88),(-600,72),(-540,95),
             (-480,85),(-420,79),(-360,71),(-300,74),(-240,80),(-180,77),
-            (-120,73),(-60,70),(-30,65)
+            (-120,73),(-60,70),(-30,65),
+            (455,70),(500,84),(545,96),(590,109),(635,82),(680,76),(730,121)
         ]
-        for (min, bpm) in daytimeHR {
+        for (min, bpm) in nonSleepHR {
             out.append(SleepSignalSample(name: SleepSignalType.heartRate.rawValue,
                                          value: bpm, unit: "bpm", date: t(min), source: .appleWatch))
         }
@@ -113,20 +121,47 @@ enum MockSleepData {
             out.append(SleepSignalSample(name: SleepSignalType.heartRate.rawValue,
                                          value: p.value, unit: "bpm", date: p.date, source: .appleWatch))
         }
+        // Duplicate/competing sensor points at the same timestamps.
+        for p in [(65.0, 62.0), (215.0, 59.0), (340.0, 66.0)] {
+            out.append(SleepSignalSample(
+                name: SleepSignalType.heartRate.rawValue,
+                value: p.1,
+                unit: "bpm",
+                date: t(p.0),
+                source: .appleWatch
+            ))
+        }
         for p in hrvSeries.points {
             out.append(SleepSignalSample(name: SleepSignalType.heartRateVariability.rawValue,
                                          value: p.value, unit: "ms", date: p.date, source: .appleWatch))
+        }
+        // A few off-session HRV records that should be excluded by tight windows.
+        for p in [(560.0, 26.0), (620.0, 31.0)] {
+            out.append(SleepSignalSample(
+                name: SleepSignalType.heartRateVariability.rawValue,
+                value: p.1,
+                unit: "ms",
+                date: t(p.0),
+                source: .appleWatch
+            ))
         }
         for p in rrSeries.points {
             out.append(SleepSignalSample(name: SleepSignalType.respiratoryRate.rawValue,
                                          value: p.value, unit: "br/min", date: p.date, source: .appleWatch))
         }
+        out.append(SleepSignalSample(
+            name: SleepSignalType.respiratoryRate.rawValue,
+            value: 20,
+            unit: "br/min",
+            date: t(610),
+            source: .appleWatch
+        ))
         return out
     }()
 
     // MARK: - Indicators
     // Matches MetricRegistry exactly (all scored metrics + weight-0 tracked metrics).
-    // Values are consistent with the stage + signal data above.
+    // These are kept stable for UI scoring previews and are intentionally not tied to messy stage/signal fixtures.
 
     static let indicators: [SleepIndicator] = [
 

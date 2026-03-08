@@ -15,6 +15,11 @@ struct MetricContribution: Identifiable {
     let hint: String?            // static directional hint from MetricDefinition
     let stats: MetricStats?      // 30-day stats; nil for new users
     let category: SleepIndicatorCategory
+
+    /// Display-only contribution used in the expanded breakdown.
+    /// Overall score logic remains unchanged.
+    var displayedPointContribution: Double { pointContribution * 2 }
+    var displayedMaxPointContribution: Double { maxPointContribution * 2 }
 }
 
 // MARK: - Main View
@@ -22,18 +27,13 @@ struct MetricContribution: Identifiable {
 struct MetricBreakdownView: View {
     let indicators: [SleepIndicator]
     var monthlyStats: [String: MetricStats] = [:]
+    var sleepScore: Double = 0
+    var recoveryScore: Double = 0
 
     // Category splits from default weights (architecture 40%, recovery 60%)
     private let weights = SleepScoreWeights.default
 
     @State private var expandedCategory: SleepIndicatorCategory? = nil
-
-    private var sections: [(SleepIndicatorCategory, Color, [MetricContribution])] {
-        [
-            (.sleepArchitecture, DS.sleepArc,    contributions(for: .sleepArchitecture)),
-            (.recovery,          DS.recoveryArc, contributions(for: .recovery))
-        ]
-    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -41,19 +41,30 @@ struct MetricBreakdownView: View {
                 .padding(.horizontal, 2)
 
             VStack(spacing: 2) {
-                ForEach(sections, id: \.0) { category, color, metrics in
-                    MetricCategorySection(
-                        category: category,
-                        accentColor: color,
-                        metrics: metrics,
-                        isExpanded: expandedCategory == category,
-                        onTap: {
-                            withAnimation(.spring(duration: 0.35)) {
-                                expandedCategory = (expandedCategory == category) ? nil : category
-                            }
+                MetricCategorySection(
+                    category: .sleepArchitecture,
+                    accentColor: DS.sleepArc,
+                    metrics: contributions(for: .sleepArchitecture),
+                    categoryScore: Int(sleepScore.rounded()),
+                    isExpanded: expandedCategory == .sleepArchitecture,
+                    onTap: {
+                        withAnimation(.spring(duration: 0.35)) {
+                            expandedCategory = (expandedCategory == .sleepArchitecture) ? nil : .sleepArchitecture
                         }
-                    )
-                }
+                    }
+                )
+                MetricCategorySection(
+                    category: .recovery,
+                    accentColor: DS.recoveryArc,
+                    metrics: contributions(for: .recovery),
+                    categoryScore: Int(recoveryScore.rounded()),
+                    isExpanded: expandedCategory == .recovery,
+                    onTap: {
+                        withAnimation(.spring(duration: 0.35)) {
+                            expandedCategory = (expandedCategory == .recovery) ? nil : .recovery
+                        }
+                    }
+                )
             }
             .background(DS.surface, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(DS.border, lineWidth: 0.5))
@@ -134,7 +145,7 @@ func formatted(value: Double, unit: String) -> String {
     case "ms", "bpm", "min":
         return "\(Int(value.rounded())) \(unit)"
     case "br/min":
-        return "\(Int(value.rounded())) br/min"
+        return "\(value.formatted(.number.precision(.fractionLength(1)))) br/min"
     case "fraction":
         return String(format: "%.2f", value)
     case "bedtime":
@@ -156,12 +167,11 @@ struct MetricCategorySection: View {
     let category: SleepIndicatorCategory
     let accentColor: Color
     let metrics: [MetricContribution]
+    let categoryScore: Int
     let isExpanded: Bool
     let onTap: () -> Void
 
-    private var totalContribution: Double {
-        metrics.reduce(0) { $0 + $1.pointContribution }
-    }
+    @State private var chevronPulse = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -174,22 +184,43 @@ struct MetricCategorySection: View {
                     Text(category.displayName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(DS.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
 
                     Spacer()
 
-                    Text(String(format: "+%.1f pts", totalContribution))
+                    Text("\(min(max(categoryScore, 0), 99))/99")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(totalContribution > 8 ? DS.green : DS.textSecondary)
+                        .foregroundStyle(categoryScore >= 75 ? DS.green : DS.textSecondary)
                         .monospacedDigit()
 
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(DS.textTertiary)
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .animation(.spring(duration: 0.3), value: isExpanded)
+                    ZStack {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(accentColor.opacity(0.6 + (chevronPulse ? 0.4 : 0)))
+                            .shadow(color: accentColor.opacity(chevronPulse ? 0.7 : 0.2), radius: chevronPulse ? 5 : 2)
+                    }
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(.spring(duration: 0.3), value: isExpanded)
+                    .onAppear {
+                        guard !isExpanded else { return }
+                        withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                            chevronPulse = true
+                        }
+                    }
+                    .onChange(of: isExpanded) { _, expanded in
+                        if expanded {
+                            withAnimation(.easeOut(duration: 0.2)) { chevronPulse = false }
+                        } else {
+                            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                                chevronPulse = true
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -221,6 +252,10 @@ struct MetricContributionRow: View {
     let metric: MetricContribution
     @State private var showDetail = false
 
+    private var contributionText: String {
+        "+\(metric.displayedPointContribution.formatted(.number.precision(.fractionLength(2))))"
+    }
+
     private var barColor: Color {
         metric.normalizedScore >= 80 ? DS.green : DS.purple
     }
@@ -228,31 +263,56 @@ struct MetricContributionRow: View {
     /// Subtitle: show actual 30d average (transparent) + delta tonight; fall back to static hint.
     private var subtitle: (text: String, color: Color)? {
         if let stats = metric.stats, stats.count > 0 {
-            let avgText = "avg \(formatted(value: stats.avg, unit: metric.unit))"
+            let avgText = "avg \(compactValueText(value: stats.avg, unit: metric.unit))"
             let delta = metric.rawValue - stats.avg
             let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
             if abs(delta) < threshold {
                 return (avgText, DS.textTertiary)
             }
             // Build delta string
-            let sign = delta > 0 ? "+" : ""
-            let deltaStr: String
-            switch metric.unit {
-            case "hr":
-                let mins = Int(abs(delta) * 60)
-                deltaStr = "\(delta > 0 ? "+" : "-")\(mins)m"
-            case "%":
-                deltaStr = "\(sign)\(String(format: "%.0f", delta))%"
-            case "fraction":
-                deltaStr = "\(sign)\(String(format: "%.2f", delta))"
-            default:
-                deltaStr = "\(sign)\(Int(abs(delta).rounded())) \(metric.unit)"
-            }
-            return ("\(avgText) · \(deltaStr) tonight", DS.textTertiary)
+            let deltaText = compactDeltaText(delta: delta, unit: metric.unit)
+            return ("\(avgText) (\(deltaText) tonight)", DS.textTertiary)
         } else if let hint = metric.hint {
             return (hint, DS.textTertiary)
         }
         return nil
+    }
+
+    private func compactValueText(value: Double, unit: String) -> String {
+        switch unit {
+        case "ms", "bpm", "min":
+            return "\(Int(value.rounded()))\(unit)"
+        case "br/min":
+            return "\(value.formatted(.number.precision(.fractionLength(1))))br/min"
+        case "%":
+            return "\(Int(value.rounded()))%"
+        case "fraction":
+            return value.formatted(.number.precision(.fractionLength(2)))
+        case "hr":
+            let hours = Int(value)
+            let minutes = Int((value - Double(hours)) * 60)
+            return "\(hours)h \(minutes)m"
+        default:
+            return formatted(value: value, unit: unit)
+        }
+    }
+
+    private func compactDeltaText(delta: Double, unit: String) -> String {
+        let prefix = delta > 0 ? "+" : "-"
+
+        switch unit {
+        case "hr":
+            let minutes = Int(abs(delta) * 60)
+            return "\(prefix)\(minutes)m"
+        case "br/min":
+            return "\(prefix)\(abs(delta).formatted(.number.precision(.fractionLength(1))))br/min"
+        case "%":
+            return "\(prefix)\(Int(abs(delta).rounded()))%"
+        case "fraction":
+            return "\(prefix)\(abs(delta).formatted(.number.precision(.fractionLength(2))))"
+        default:
+            return "\(prefix)\(Int(abs(delta).rounded()))\(unit)"
+        }
     }
 
     var body: some View {
@@ -281,10 +341,10 @@ struct MetricContributionRow: View {
                             .foregroundStyle(DS.textPrimary)
                             .monospacedDigit()
 
-                        Text(String(format: "+%.2f pts", metric.pointContribution))
+                        Text(contributionText)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(
-                                metric.pointContribution > metric.maxPointContribution * 0.75
+                                metric.displayedPointContribution > metric.displayedMaxPointContribution * 0.75
                                 ? DS.green : DS.textTertiary
                             )
                             .monospacedDigit()

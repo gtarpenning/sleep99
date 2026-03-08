@@ -60,9 +60,10 @@ actor CloudKitService {
             share = existing
         } else {
             share = CKShare(recordZoneID: zone.zoneID)
-            share.publicPermission = .readOnly
             share[CKShare.SystemFieldKey.title] = "My Sleep Score"
         }
+        // Keep sharing mode consistent: public read-only link sharing.
+        share.publicPermission = .readOnly
 
         // 5. Save record + share atomically. CKShare MUST be saved with the data record.
         // Capture the server-returned share from perRecordSaveBlock — that's where .url is populated.
@@ -134,9 +135,10 @@ actor CloudKitService {
             share = existing
         } else {
             share = CKShare(recordZoneID: zone.zoneID)
-            share.publicPermission = .readOnly
             share[CKShare.SystemFieldKey.title] = "My Sleep Score"
         }
+        // Keep sharing mode consistent: public read-only link sharing.
+        share.publicPermission = .readOnly
 
         let op = CKModifyRecordsOperation(recordsToSave: [record, share])
         op.savePolicy = .changedKeys
@@ -204,17 +206,14 @@ actor CloudKitService {
         let predicate = NSPredicate(format: "date >= %@", yesterday as NSDate)
         let query = CKQuery(recordType: "SleepScore", predicate: predicate)
         let results = try await sharedDB.records(matching: query)
-        var seen = Set<String>()
-        var pairs: [(FamilyMember, DailySleepScore)] = []
+        var latestByMember: [String: (FamilyMember, DailySleepScore)] = [:]
         for result in results.matchResults {
             guard let record = try? result.1.get(),
                   let memberID = record["memberID"] as? String,
                   let displayName = record["displayName"] as? String,
                   let date = record["date"] as? Date,
-                  let score = record["score"] as? Double,
-                  !seen.contains(memberID)
+                  let score = record["score"] as? Double
             else { continue }
-            seen.insert(memberID)
             let member = FamilyMember(
                 id: memberID,
                 displayName: displayName,
@@ -232,9 +231,13 @@ actor CloudKitService {
                 totalSleepMinutes: record["totalSleepMinutes"] as? Int ?? 0,
                 primarySource: SleepIndicatorSource(rawValue: record["primarySource"] as? String ?? "") ?? .appleHealth
             )
-            pairs.append((member, dailyScore))
+
+            if let existing = latestByMember[memberID], existing.1.date >= dailyScore.date {
+                continue
+            }
+            latestByMember[memberID] = (member, dailyScore)
         }
-        return pairs
+        return Array(latestByMember.values)
     }
 
     // MARK: - Helpers

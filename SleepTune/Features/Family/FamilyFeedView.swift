@@ -1,9 +1,10 @@
 import SwiftUI
 import CloudKit
+import UIKit
 
 struct FamilyFeedView: View {
     @Bindable var viewModel: FamilyFeedViewModel
-    @State private var showCloudSharing = false
+    @State private var showInviteSheet = false
 
     var body: some View {
         NavigationStack {
@@ -28,7 +29,7 @@ struct FamilyFeedView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await prepareAndShare() }
+                        shareTapped()
                     } label: {
                         Image(systemName: "person.badge.plus")
                             .foregroundStyle(DS.purple)
@@ -38,13 +39,10 @@ struct FamilyFeedView: View {
             .refreshable {
                 await viewModel.refresh()
             }
-            .sheet(isPresented: $showCloudSharing) {
-                if let (share, container) = viewModel.pendingShare {
-                    CloudSharingView(share: share, container: container)
-                        .ignoresSafeArea()
-                }
+            .sheet(isPresented: $showInviteSheet) {
+                InviteSheet(makeShare: { try await viewModel.makeShare() })
             }
-            .alert("Could not create invite", isPresented: .init(
+            .alert("Could not share", isPresented: .init(
                 get: { viewModel.shareError != nil },
                 set: { if !$0 { viewModel.shareError = nil } }
             )) {
@@ -63,35 +61,185 @@ struct FamilyFeedView: View {
         }
     }
 
-    private func prepareAndShare() async {
-        await viewModel.prepareShare()
-        if viewModel.pendingShare != nil {
-            showCloudSharing = true
-        }
+    private func shareTapped() {
+        guard viewModel.canShareOrSetError() else { return }
+        showInviteSheet = true
     }
 }
 
-// MARK: - UICloudSharingController wrapper
+// MARK: - Custom Invite Sheet
 
-private struct CloudSharingView: UIViewControllerRepresentable {
-    let share: CKShare
-    let container: CKContainer
+/// Dark-themed invite sheet. Fetches a CKShare URL then presents UIActivityViewController
+/// (iMessage, AirDrop, copy link, etc.). Works in Simulator and on device, fully themed.
+private struct InviteSheet: View {
+    let makeShare: () async throws -> (CKShare, CKContainer)
+    @Environment(\.dismiss) private var dismiss
 
-    func makeUIViewController(context: Context) -> UICloudSharingController {
-        let controller = UICloudSharingController(share: share, container: container)
-        controller.availablePermissions = [.allowReadOnly, .allowPrivate]
-        controller.delegate = context.coordinator
-        return controller
-    }
+    @State private var isLoading = false
+    @State private var errorMessage: String? = nil
+    @State private var pendingURL: WrappedURL? = nil  // non-nil triggers the activity sheet
 
-    func updateUIViewController(_ uiViewController: UICloudSharingController, context: Context) {}
+    var body: some View {
+        ZStack {
+            DS.bg.ignoresSafeArea()
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+            VStack(spacing: 0) {
+                // Drag handle
+                Capsule()
+                    .fill(DS.border)
+                    .frame(width: 36, height: 4)
+                    .padding(.top, 12)
+                    .padding(.bottom, 32)
 
-    class Coordinator: NSObject, UICloudSharingControllerDelegate {
-        func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
-            print("[CloudSharing] failed: \(error)")
+                Spacer()
+
+                // Icon + headline
+                VStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(DS.purpleDim)
+                            .frame(width: 72, height: 72)
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(DS.purple)
+                    }
+
+                    VStack(spacing: 8) {
+                        Text("Invite a Friend")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(DS.textPrimary)
+                        Text("Share a link so a friend can see your sleep scores in their Family tab.")
+                            .font(.subheadline)
+                            .foregroundStyle(DS.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                }
+
+                Spacer()
+
+                // Action area
+                VStack(spacing: 16) {
+                    if let msg = errorMessage {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .padding(.top, 1)
+                            Text(msg)
+                                .font(.footnote)
+                                .foregroundStyle(DS.textSecondary)
+                                .multilineTextAlignment(.leading)
+                            Spacer()
+                        }
+                        .padding(14)
+                        .background(DS.surface, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(DS.border, lineWidth: 0.5))
+                    }
+
+                    Button {
+                        Task { await fetchAndShare() }
+                    } label: {
+                        ZStack {
+                            if isLoading {
+                                HStack(spacing: 10) {
+                                    ProgressView().tint(.white)
+                                    Text("Creating link…")
+                                        .fontWeight(.semibold)
+                                }
+                            } else {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "message.fill")
+                                    Text(errorMessage != nil ? "Try Again" : "Share via iMessage")
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(DS.purple, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLoading)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 40)
+            }
         }
-        func itemTitle(for csc: UICloudSharingController) -> String? { "My Sleep Score" }
+        .colorScheme(.dark)
+        .presentationDetents([.medium])
+        .presentationBackground(DS.bg)
+        .sheet(item: $pendingURL) { wrapped in
+            ActivityView(url: wrapped.url) {
+                pendingURL = nil
+                dismiss()
+            }
+        }
     }
+
+    @MainActor
+    private func fetchAndShare() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let (share, _) = try await makeShare()
+            guard let url = share.url else {
+                errorMessage = "Share link was created but CloudKit returned no URL. Try again."
+                return
+            }
+            pendingURL = WrappedURL(url)
+        } catch {
+            errorMessage = friendlyError(error)
+        }
+    }
+
+    private func friendlyError(_ error: Error) -> String {
+        if let ckError = error as? CKError {
+            switch ckError.code {
+            case .notAuthenticated:
+                return "Sign in to iCloud in Settings → [your name] → iCloud to share sleep scores."
+            case .networkUnavailable, .networkFailure:
+                return "No internet connection. Check your network and try again."
+            case .quotaExceeded:
+                return "iCloud storage is full. Free up space and try again."
+            case .permissionFailure:
+                return "iCloud permission denied. Check Settings → Privacy → iCloud."
+            default:
+                return "CloudKit error \(ckError.code.rawValue): \(ckError.localizedDescription)"
+            }
+        }
+        if let shareError = error as? ShareError {
+            return shareError.errorDescription ?? error.localizedDescription
+        }
+        // Simulator-specific: CloudKit is unavailable without a signed-in iCloud account.
+        let desc = error.localizedDescription
+        if desc.contains("iCloud") || desc.contains("CloudKit") || desc.contains("account") {
+            return "iCloud is not available. Sign in to iCloud in Settings, or test on a real device."
+        }
+        return desc
+    }
+}
+
+// MARK: - Helpers
+
+private struct WrappedURL: Identifiable {
+    let id = UUID()
+    let url: URL
+    init(_ url: URL) { self.url = url }
+}
+
+private struct ActivityView: UIViewControllerRepresentable {
+    let url: URL
+    var onDismiss: (() -> Void)? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let message = "Join me on SleepTune! Tap to see my sleep scores in your Family tab."
+        let vc = UIActivityViewController(activityItems: [message, url], applicationActivities: nil)
+        vc.completionWithItemsHandler = { _, _, _, _ in onDismiss?() }
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

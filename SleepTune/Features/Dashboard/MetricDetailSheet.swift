@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MetricDetailSheet: View {
     let metric: MetricContribution
+    @State private var selectedDetent: PresentationDetent = .fraction(0.9)
 
     var body: some View {
         NavigationStack {
@@ -29,7 +30,7 @@ struct MetricDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.fraction(0.9), .large], selection: $selectedDetent)
         .presentationBackground(DS.bg)
         .presentationCornerRadius(28)
     }
@@ -46,7 +47,7 @@ struct MetricDetailSheet: View {
 
             Text(metric.formattedValue)
                 .font(.system(size: 56, weight: .bold, design: .rounded))
-                .foregroundStyle(scoreColor)
+                .foregroundStyle(currentValueColor)
                 .monospacedDigit()
 
             if let sub = contextLabel {
@@ -64,7 +65,9 @@ struct MetricDetailSheet: View {
     // MARK: - 30d range bar
 
     private func rangeSection(stats: MetricStats) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let accent = rangeAccentColor(stats: stats)
+
+        return VStack(alignment: .leading, spacing: 14) {
             Text("30-Day Range")
                 .font(.caption.weight(.semibold))
                 .tracking(0.8)
@@ -82,7 +85,7 @@ struct MetricDetailSheet: View {
                     // Fill up to tonight's position
                     let tonightPos = stats.normalizedPosition(of: metric.rawValue)
                     Capsule()
-                        .fill(scoreColor.opacity(0.6))
+                        .fill(accent.opacity(0.7))
                         .frame(width: max(w * tonightPos, 8), height: 8)
 
                     // Avg marker
@@ -94,7 +97,7 @@ struct MetricDetailSheet: View {
 
                     // Tonight marker
                     Circle()
-                        .fill(scoreColor)
+                        .fill(accent)
                         .frame(width: 14, height: 14)
                         .overlay(Circle().strokeBorder(DS.bg, lineWidth: 2))
                         .offset(x: max(w * tonightPos - 7, 0))
@@ -133,32 +136,35 @@ struct MetricDetailSheet: View {
     // MARK: - Stats grid
 
     private func statsGrid(stats: MetricStats) -> some View {
-        HStack(spacing: 10) {
+        let ptsValue = String(
+            format: "%.1f/%.1f",
+            metric.displayedPointContribution,
+            metric.displayedMaxPointContribution
+        )
+        return HStack(spacing: 10) {
             statCell(
                 value: formatted(value: metric.rawValue - stats.avg, unit: metric.unit, signed: true),
                 label: "vs avg",
-                good: metric.lowerIsBetter
-                    ? metric.rawValue < stats.avg
-                    : metric.rawValue > stats.avg
+                valueColor: isAtOrBetterThanAverage(avg: stats.avg) ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
             )
             statCell(
                 value: "\(stats.count)",
                 label: "nights tracked",
-                good: stats.count >= 14
+                valueColor: DS.textPrimary
             )
             statCell(
-                value: String(format: "%.0f", metric.normalizedScore) + "%",
-                label: "score",
-                good: metric.normalizedScore >= 75
+                value: ptsValue,
+                label: "pts",
+                valueColor: metric.normalizedScore >= 75 ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
             )
         }
     }
 
-    private func statCell(value: String, label: String, good: Bool) -> some View {
+    private func statCell(value: String, label: String, valueColor: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.system(.title3, design: .rounded, weight: .bold))
-                .foregroundStyle(DS.textPrimary)
+                .foregroundStyle(valueColor)
                 .monospacedDigit()
             Text(label)
                 .font(.system(size: 9, weight: .semibold))
@@ -174,7 +180,16 @@ struct MetricDetailSheet: View {
 
     // MARK: - Helpers
 
-    private var scoreColor: Color {
+    private var currentValueColor: Color {
+        if let stats = metric.stats {
+            if isAtOrBetterThanAverage(avg: stats.avg) {
+                return DS.green
+            }
+            return metric.normalizedScore >= 50
+                ? Color(red: 1.0, green: 0.62, blue: 0.04)
+                : Color(red: 1.0, green: 0.27, blue: 0.23)
+        }
+
         let s = metric.normalizedScore
         if s >= 85 { return DS.green }
         if s >= 70 { return DS.purple }
@@ -188,14 +203,38 @@ struct MetricDetailSheet: View {
             let delta = metric.rawValue - stats.avg
             let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
             guard abs(delta) >= threshold else { return nil }
-            let sign = delta > 0 ? "+" : ""
             let deltaStr = formatted(value: delta, unit: metric.unit, signed: true)
-            let isGood = metric.lowerIsBetter ? delta < 0 : delta > 0
             let direction = delta > 0 ? "above" : "below"
-            let _ = isGood  // used for colour in statCell
             return "\(deltaStr) \(direction) your average"
         }
         return nil
+    }
+
+    private func rangeAccentColor(stats: MetricStats) -> Color {
+        if isAtOrBetterThanAverage(avg: stats.avg) {
+            return DS.green
+        }
+
+        // Beneath personal baseline should not look "perfect green".
+        return Color(red: 0.90, green: 0.76, blue: 0.24)
+    }
+
+    private func isAtOrBetterThanAverage(avg: Double) -> Bool {
+        let delta = metric.rawValue - avg
+        let threshold = baselineThreshold(for: metric.unit)
+        if abs(delta) < threshold { return true }
+        return metric.lowerIsBetter ? metric.rawValue < avg : metric.rawValue > avg
+    }
+
+    private func baselineThreshold(for unit: String) -> Double {
+        switch unit {
+        case "hr":
+            return 10.0 / 60.0
+        case "fraction":
+            return 0.05
+        default:
+            return 0.5
+        }
     }
 }
 

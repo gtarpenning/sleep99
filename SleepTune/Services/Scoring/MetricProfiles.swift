@@ -30,6 +30,60 @@ enum ScoringShape {
 func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
     guard let shape = MetricRegistry.definition(for: name)?.scoring else { return nil }
 
+    // Blood Oxygen: combines an absolute quality floor with a steep personal decay.
+    // Handled before the avg-only block because both curves apply regardless of history.
+    if name == "Blood Oxygen" {
+        // Absolute curve: 97%+ = perfect, exactly 95% = 1/3, 88% = 0.
+        // 95–97%: linear ramp 1/3 → 1.0
+        // 88–95%: linear ramp 0 → 1/3
+        let absoluteScore: Double = {
+            if value >= 97 { return 1.0 }
+            if value >= 95 { return 1.0/3.0 + (value - 95.0) / 2.0 * (2.0/3.0) }
+            return max(0, (value - 88.0) / 7.0 * (1.0/3.0))
+        }()
+
+        if let avg = monthlyAvg {
+            // At or above personal avg: absolute floor is the score (e.g. avg of 96% still isn't perfect).
+            if value >= avg { return absoluteScore }
+            // 1% below avg → −30 pts. Take the more conservative of personal and absolute.
+            let personalScore = max(0.0, 1.0 - (avg - value) * 0.30)
+            return min(personalScore, absoluteScore)
+        }
+
+        return absoluteScore
+    }
+
+    // Per-metric sensitivity tuning when we have a personal baseline.
+    // These curves intentionally penalize meaningful regressions harder than the generic
+    // hardMin/idealMin and idealMax/hardMax shapes.
+    if let avg = monthlyAvg {
+        switch name {
+        case "Sleep Duration":
+            // 15 min below baseline -> ~67% score. 45 min below baseline -> ~0%.
+            if value >= avg { return 1 }
+            return max(0, 1 - (avg - value) / 0.75)
+
+        case "HRV":
+            // 10 ms below baseline -> 50% score. 20 ms below baseline -> ~0%.
+            if value >= avg { return 1 }
+            return max(0, 1 - (avg - value) / 20)
+
+        case "Overnight Heart Rate":
+            // 3 bpm above baseline -> ~60% score. 7.5 bpm above baseline -> ~0%.
+            if value <= avg { return 1 }
+            return max(0, 1 - (value - avg) / 7.5)
+
+        case "Respiratory Rate":
+            // At or below personal avg = perfect. Breathing rate moves very little night-to-night.
+            // 2 br/min above avg -> 33% score. 3 br/min above avg -> ~0%.
+            if value <= avg { return 1 }
+            return max(0, 1 - (value - avg) / 3.0)
+
+        default:
+            break
+        }
+    }
+
     switch shape {
     case .higherIsBetter(let hardMin, let idealMin):
         // Personal average raises the bar; fallback to idealMin for new users

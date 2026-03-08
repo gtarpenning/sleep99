@@ -10,6 +10,7 @@ struct ScoreHeroView: View {
     let hrDeviation: Double
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
+    private let daySwipeThreshold: CGFloat = 56
 
     private var scoreInt: Int { Int(summary.score.rounded()) }
     private var scoreColor: Color { DS.scoreColor(for: summary.score) }
@@ -61,6 +62,11 @@ struct ScoreHeroView: View {
             subScorePills
                 .padding(.top, 16)
         }
+        .contentShape(.rect)
+        .gesture(
+            DragGesture(minimumDistance: 16)
+                .onEnded(handleDaySwipe)
+        )
     }
 
     // MARK: - Subviews
@@ -121,6 +127,22 @@ struct ScoreHeroView: View {
         HStack(spacing: 8) {
             ScorePill(label: "Sleep", score: summary.sleepScore, color: DS.sleepArc)
             ScorePill(label: "Recovery", score: summary.recoveryScore, color: DS.recoveryArc)
+        }
+    }
+
+    private func handleDaySwipe(_ value: DragGesture.Value) {
+        let horizontalDistance = value.translation.width
+        let verticalDistance = value.translation.height
+
+        guard abs(horizontalDistance) > abs(verticalDistance) else { return }
+        guard abs(horizontalDistance) >= daySwipeThreshold else { return }
+
+        if horizontalDistance < 0 {
+            if !isToday {
+                onNextDay()
+            }
+        } else {
+            onPreviousDay()
         }
     }
 }

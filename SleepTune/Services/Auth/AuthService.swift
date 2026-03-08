@@ -42,9 +42,7 @@ final class AuthService {
 
         do {
             try KeychainItem(service: "com.sleep-tune.app", account: "userID").saveItem(uid)
-        } catch {
-            print("[Auth] Keychain save failed: \(error)")
-        }
+        } catch {}
 
         // fullName is only delivered on first sign-in; preserve stored name on re-auth
         if !name.isEmpty {

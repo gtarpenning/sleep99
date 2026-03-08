@@ -11,8 +11,6 @@ final class FamilyFeedViewModel {
     var selectedDate: Date = Date()
     var isLoading: Bool = false
     var shareError: String?
-    /// Set before presenting UICloudSharingController
-    var pendingShare: (CKShare, CKContainer)?
 
     private let authService: AuthService
     private let cloudKitService: CloudKitService
@@ -24,6 +22,14 @@ final class FamilyFeedViewModel {
         let myID = authService.userID ?? "me"
         let myName = authService.displayName ?? "You"
         members = [FamilyMember(id: myID, displayName: myName, avatarColor: "#5E5CE6", avatarEmoji: authService.avatarEmoji, isCurrentUser: true)]
+
+        // Refresh family feed whenever a share is accepted (e.g. tapping a link in iMessage).
+        Task { @MainActor [weak self] in
+            let stream = NotificationCenter.default.notifications(named: .cloudKitShareAccepted)
+            for await _ in stream {
+                await self?.refresh()
+            }
+        }
     }
 
     func refresh() async {
@@ -56,26 +62,47 @@ final class FamilyFeedViewModel {
         member.isCurrentUser ? currentUserScore : scores[member.id]
     }
 
-    func prepareShare() async {
-        guard let userID = authService.userID else {
-            shareError = "Sign in with Apple to create an invite."
-            return
+    /// Returns (CKShare, CKContainer) for use inside UICloudSharingController's preparation handler.
+    /// Called only after the user picks a share method — network latency is hidden by composition time.
+    func makeShare() async throws -> (CKShare, CKContainer) {
+        guard authService.isSignedIn, let userID = authService.userID else {
+            throw ShareError.notSignedIn
         }
         guard let score = currentUserScore else {
-            shareError = "Open the Sleep tab and let your score load first, then try again."
-            return
+            throw ShareError.noScore
         }
-        do {
-            pendingShare = try await cloudKitService.prepareShare(
-                score.toSummary(),
-                totalMinutes: score.totalSleepMinutes,
-                userID: userID,
-                displayName: authService.displayName ?? "Me",
-                avatarColor: "#5E5CE6",
-                avatarEmoji: authService.avatarEmoji
-            )
-        } catch {
-            shareError = error.localizedDescription
+        return try await cloudKitService.prepareShare(
+            score.toSummary(),
+            totalMinutes: score.totalSleepMinutes,
+            userID: userID,
+            displayName: authService.displayName ?? "Me",
+            avatarColor: "#5E5CE6",
+            avatarEmoji: authService.avatarEmoji
+        )
+    }
+
+    /// Checks prerequisites before showing the share sheet. Sets shareError and returns false if unmet.
+    func canShareOrSetError() -> Bool {
+        if !authService.isSignedIn {
+            shareError = "Sign in with Apple to share your score."
+            return false
+        }
+        if currentUserScore == nil {
+            shareError = "Open the Sleep tab and let your score load first."
+            return false
+        }
+        return true
+    }
+}
+
+enum ShareError: LocalizedError {
+    case notSignedIn
+    case noScore
+
+    var errorDescription: String? {
+        switch self {
+        case .notSignedIn: return "Sign in with Apple to share your score."
+        case .noScore:     return "Open the Sleep tab and let your score load first."
         }
     }
 }

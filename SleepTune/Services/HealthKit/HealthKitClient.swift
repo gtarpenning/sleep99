@@ -368,13 +368,6 @@ private extension HealthKitClient {
         // This prevents summing two nights or a nap from the same 20-hour query window.
         let samples = filteredToPrimarySession(allSamples)
 
-        var inBed: TimeInterval = 0
-        var asleep: TimeInterval = 0
-        var rem: TimeInterval = 0
-        var core: TimeInterval = 0
-        var deep: TimeInterval = 0
-        var awake: TimeInterval = 0
-
         let asleepSamples = samples.filter { sample in
             switch HKCategoryValueSleepAnalysis(rawValue: sample.value) {
             case .asleepUnspecified, .asleepREM, .asleepCore, .asleepDeep:
@@ -408,30 +401,15 @@ private extension HealthKitClient {
             return hasAsleepBefore && hasAsleepAfter
         }
 
-        for sample in samples {
-            let duration = sample.endDate.timeIntervalSince(sample.startDate)
-            switch HKCategoryValueSleepAnalysis(rawValue: sample.value) {
-            case .inBed:
-                inBed += duration
-            case .asleepUnspecified:
-                asleep += duration
-            case .asleepREM:
-                asleep += duration
-                rem += duration
-            case .asleepCore:
-                asleep += duration
-                core += duration
-            case .asleepDeep:
-                asleep += duration
-                deep += duration
-            case .awake:
-                awake += duration
-            case .none:
-                break
-            @unknown default:
-                break
-            }
+        // Use interval union to avoid double-counting when multiple sources (e.g. Oura + Apple Watch)
+        // write overlapping asleep records for the same time period.
+        let asleep = unionSleepSeconds(from: samples) { v in
+            v == .asleepUnspecified || v == .asleepREM || v == .asleepCore || v == .asleepDeep
         }
+        let rem  = unionSleepSeconds(from: samples) { $0 == .asleepREM }
+        let deep = unionSleepSeconds(from: samples) { $0 == .asleepDeep }
+        let core = unionSleepSeconds(from: samples) { $0 == .asleepCore }
+        let inBed = unionSleepSeconds(from: samples) { $0 == .inBed }
 
         let hoursAsleep = asleep / 3600
 
@@ -542,19 +520,42 @@ private extension HealthKitClient {
     }
 
     func sleepDurationHours(from samples: [HKCategorySample]) -> Double {
-        var asleep: TimeInterval = 0
-        for sample in samples {
-            let duration = sample.endDate.timeIntervalSince(sample.startDate)
-            switch HKCategoryValueSleepAnalysis(rawValue: sample.value) {
-            case .asleepUnspecified, .asleepREM, .asleepCore, .asleepDeep:
-                asleep += duration
-            case .inBed, .awake, .none:
-                break
-            @unknown default:
-                break
+        unionSleepSeconds(from: samples) { v in
+            v == .asleepUnspecified || v == .asleepREM || v == .asleepCore || v == .asleepDeep
+        } / 3600
+    }
+
+    /// Computes the union of time intervals for samples matching the given filter.
+    /// Prevents double-counting when multiple sources (e.g. Oura, Apple Watch) write
+    /// overlapping records for the same time period.
+    func unionSleepSeconds(
+        from samples: [HKCategorySample],
+        filter: (HKCategoryValueSleepAnalysis) -> Bool
+    ) -> TimeInterval {
+        let intervals = samples
+            .compactMap { sample -> (Date, Date)? in
+                guard let v = HKCategoryValueSleepAnalysis(rawValue: sample.value), filter(v) else { return nil }
+                return (sample.startDate, sample.endDate)
+            }
+            .sorted { $0.0 < $1.0 }
+
+        guard !intervals.isEmpty else { return 0 }
+
+        var total: TimeInterval = 0
+        var start = intervals[0].0
+        var end   = intervals[0].1
+
+        for (s, e) in intervals.dropFirst() {
+            if s <= end {
+                end = max(end, e)
+            } else {
+                total += end.timeIntervalSince(start)
+                start = s
+                end   = e
             }
         }
-        return asleep / 3600
+        total += end.timeIntervalSince(start)
+        return total
     }
 
     func buildRecoveryIndicators(

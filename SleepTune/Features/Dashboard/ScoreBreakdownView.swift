@@ -5,25 +5,28 @@ struct ScoreBreakdownView: View {
     let indicators: [SleepIndicator]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                BreakdownCard(
-                    title: "Sleep",
-                    iconName: "moon.fill",
-                    score: summary.sleepScore,
-                    accentColor: DS.sleepArc,
-                    metrics: metrics(for: .sleepArchitecture)
-                )
-                BreakdownCard(
-                    title: "Recovery",
-                    iconName: "heart.fill",
-                    score: summary.recoveryScore,
-                    accentColor: DS.recoveryArc,
-                    metrics: metrics(for: .recovery)
-                )
-            }
-            .padding(.horizontal)
+        HStack(spacing: 10) {
+            BreakdownCard(
+                title: "Sleep",
+                iconName: "moon.fill",
+                score: summary.sleepScore,
+                accentColor: DS.sleepArc,
+                metrics: metrics(for: .sleepArchitecture)
+            )
+            .frame(maxWidth: .infinity)
+
+            BreakdownCard(
+                title: "Recovery",
+                iconName: "heart.fill",
+                score: summary.recoveryScore,
+                accentColor: DS.recoveryArc,
+                metrics: metrics(for: .recovery)
+            )
+            .frame(maxWidth: .infinity)
         }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity)
     }
 
     // Top-N metrics per card, ordered by registry weight descending (tiebreak: name).
@@ -72,7 +75,9 @@ struct ScoreBreakdownView: View {
             let ampm = h < 12 ? "AM" : "PM"
             let displayH = h == 0 ? 12 : h > 12 ? h - 12 : h
             return String(format: "%d:%02d %@", displayH, m, ampm)
-        case "%", "ms", "bpm", "br/min": return "\(Int(v.rounded())) \(i.unit)"
+        case "%", "ms", "bpm": return "\(Int(v.rounded())) \(i.unit)"
+        case "br/min":
+            return "\(v.formatted(.number.precision(.fractionLength(1)))) \(i.unit)"
         default:         return String(format: "%.1f \(i.unit)", v)
         }
     }
@@ -99,14 +104,18 @@ struct BreakdownCard: View {
                     Image(systemName: iconName)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(accentColor)
+                        .fixedSize()
                     Text(title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(DS.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                Spacer()
+                Spacer(minLength: 4)
                 Text("\(Int(score.rounded()))")
                     .font(.system(.title2, design: .rounded, weight: .bold))
                     .foregroundStyle(accentColor)
+                    .fixedSize()
             }
 
             GeometryReader { geo in
@@ -141,7 +150,6 @@ struct BreakdownCard: View {
 
         }
         .padding(14)
-        .frame(width: 184)
         .background(DS.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(DS.border, lineWidth: 0.5))
     }

@@ -78,10 +78,17 @@ final class DashboardViewModel {
         let stored = await localStore.loadIndicators(for: selectedDate)
         if !stored.isEmpty {
             indicators = stored
-            recalculateScore()
             await loadTrendHistory()
             await refreshLastNightData()
             await loadMonthlyStats()
+            // Recalculate after monthly stats are loaded so personal baselines are applied.
+            recalculateScore()
+
+            // Cached indicators can be stale from older parsing logic.
+            // If live stage-derived duration is far from the cached duration, refetch this day.
+            if shouldRefreshCachedIndicators() {
+                await refreshFromHealthKit()
+            }
         } else {
             // No cache — fetch from HealthKit
             await refreshFromHealthKit()
@@ -204,9 +211,7 @@ final class DashboardViewModel {
                 avatarColor: "#5E5CE6",
                 avatarEmoji: authService.avatarEmoji
             )
-        } catch {
-            print("[CloudKit] publishTodayScore failed: \(error)")
-        }
+        } catch {}
     }
 
     private func refreshLastNightData() async {
@@ -284,6 +289,26 @@ final class DashboardViewModel {
             .map { SleepChartPoint(date: $0.date, value: $0.value) }
             .sorted { $0.date < $1.date }
         return SleepChartSeries(title: type.displayName, unit: unit, points: points)
+    }
+
+    private func shouldRefreshCachedIndicators() -> Bool {
+        guard let cachedSleepDuration = indicators.first(where: { $0.name == "Sleep Duration" })?.value else {
+            return false
+        }
+
+        let stageDerivedHours = stageAsleepHours(from: lastNightStages)
+        guard stageDerivedHours > 0 else { return false }
+
+        // Only trigger when mismatch is large enough to indicate stale/incorrect cache.
+        return abs(stageDerivedHours - cachedSleepDuration) >= 1.5
+    }
+
+    private func stageAsleepHours(from stages: [SleepStageSample]) -> Double {
+        let asleepStages = stages.filter { $0.stage != .inBed && $0.stage != .awake }
+        let seconds = asleepStages.reduce(0.0) { partial, sample in
+            partial + sample.endDate.timeIntervalSince(sample.startDate)
+        }
+        return seconds / 3600
     }
 
     private func resetDashboardData() {
