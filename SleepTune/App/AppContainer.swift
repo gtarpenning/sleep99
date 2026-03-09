@@ -43,6 +43,7 @@ final class AppContainer {
     let dashboardViewModel: DashboardViewModel
     let settingsViewModel: SettingsViewModel
     let familyFeedViewModel: FamilyFeedViewModel
+    let tagStore: SleepTagStore
 
     private let healthKitClient: HealthKitClient
     private let scoreEngine: SleepScoreEngine
@@ -61,6 +62,7 @@ final class AppContainer {
         self.localStore = localStore
         self.authService = auth
         self.cloudKitService = cloudKit
+        self.tagStore = SleepTagStore()
 
         self.dashboardViewModel = DashboardViewModel(
             healthKitClient: healthKitClient,

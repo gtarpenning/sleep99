@@ -59,25 +59,26 @@ func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
     if let avg = monthlyAvg {
         switch name {
         case "Sleep Duration":
-            // 15 min below baseline -> ~67% score. 45 min below baseline -> ~0%.
+            // At or above avg → 100%. -25% per hour below avg. 4h short → 0%.
             if value >= avg { return 1 }
-            return max(0, 1 - (avg - value) / 0.75)
+            return max(0, 1 - (avg - value) / 4.0)
 
         case "HRV":
             // 10 ms below baseline -> 50% score. 20 ms below baseline -> ~0%.
             if value >= avg { return 1 }
             return max(0, 1 - (avg - value) / 20)
 
-        case "Overnight Heart Rate":
-            // 3 bpm above baseline -> ~60% score. 7.5 bpm above baseline -> ~0%.
+        case "Overnight Heart Rate", "Lowest Overnight HR":
+            // -10% per bpm above personal avg. At or below = perfect.
+            // +3 bpm → 70%, +10 bpm → 0%.
             if value <= avg { return 1 }
-            return max(0, 1 - (value - avg) / 7.5)
+            return max(0, 1 - (value - avg) * 0.10)
 
         case "Respiratory Rate":
-            // At or below personal avg = perfect. Breathing rate moves very little night-to-night.
-            // 2 br/min above avg -> 33% score. 3 br/min above avg -> ~0%.
+            // Very sensitive: +0.2 br/min above avg = -30%. At or below = perfect.
+            // Slope: 1.5 per br/min → 0.3 penalty per 0.2 br/min.
             if value <= avg { return 1 }
-            return max(0, 1 - (value - avg) / 3.0)
+            return max(0, 1 - (value - avg) * 1.5)
 
         default:
             break

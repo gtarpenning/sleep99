@@ -11,6 +11,7 @@ import SwiftUI
 
 struct SleepDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
+    @Environment(AppContainer.self) private var container
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -65,7 +66,8 @@ struct SleepDashboardView: View {
                     ),
                     hrDeviation: hrDeviationFromBaseline,
                     onPreviousDay: { shiftDate(by: -1) },
-                    onNextDay: { shiftDate(by: 1) }
+                    onNextDay: { shiftDate(by: 1) },
+                    isLoading: viewModel.isSyncing && viewModel.summary.score == 0
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -105,6 +107,10 @@ struct SleepDashboardView: View {
                 // Trend
                 ScoreTrendsSectionView(viewModel: viewModel)
                     .padding(.horizontal, 20)
+
+                // Tags — at the very bottom, low friction
+                SleepTagBarView(store: container.tagStore, date: viewModel.selectedDate)
+                    .padding(.top, 4)
 
                 // Bottom breathing room
                 Color.clear.frame(height: 20)

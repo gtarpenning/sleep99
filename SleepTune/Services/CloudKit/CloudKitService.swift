@@ -9,6 +9,8 @@ actor CloudKitService {
     /// All SleepScore records live in this zone so CKShare works correctly.
     /// (Default-zone records cannot be individually shared via CKShare.)
     private let zone = CKRecordZone(zoneName: "SleepScores")
+    /// CloudKit uses this fixed record name for a zone-level share.
+    private let zoneShareRecordName = "cloudkit.zoneshare"
 
     init() {
         container = CKContainer(identifier: "iCloud.com.sleep-tune.app")
@@ -54,7 +56,7 @@ actor CloudKitService {
         record["primarySource"]     = summary.primarySource.rawValue
 
         // 4. Fetch or create the zone-level share (one share covers all records in the zone).
-        let shareRecordID = CKRecord.ID(recordName: "cloudkit.share", zoneID: zone.zoneID)
+        let shareRecordID = CKRecord.ID(recordName: zoneShareRecordName, zoneID: zone.zoneID)
         let share: CKShare
         if let existing = try? await privateDB.record(for: shareRecordID) as? CKShare {
             share = existing
@@ -129,7 +131,7 @@ actor CloudKitService {
         record["totalSleepMinutes"] = totalMinutes
         record["primarySource"]     = summary.primarySource.rawValue
 
-        let shareRecordID = CKRecord.ID(recordName: "cloudkit.share", zoneID: zone.zoneID)
+        let shareRecordID = CKRecord.ID(recordName: zoneShareRecordName, zoneID: zone.zoneID)
         let share: CKShare
         if let existing = try? await privateDB.record(for: shareRecordID) as? CKShare {
             share = existing
@@ -160,6 +162,13 @@ actor CloudKitService {
                 }
             }
             privateDB.add(op)
+        }
+
+        // In some cases CloudKit omits URL on the first returned share object.
+        // Re-fetching by ID typically returns the hydrated share metadata.
+        if savedShare.url == nil,
+           let refreshed = try? await privateDB.record(for: savedShare.recordID) as? CKShare {
+            return (refreshed, container)
         }
         return (savedShare, container)
     }
@@ -200,44 +209,58 @@ actor CloudKitService {
 
     // MARK: - Fetch group data
 
-    /// Returns (member, score) pairs from records shared with the current user.
-    func fetchGroupData() async throws -> [(FamilyMember, DailySleepScore)] {
+    /// Returns (member, score, zoneID) tuples from records shared with the current user.
+    func fetchGroupData() async throws -> [(FamilyMember, DailySleepScore, CKRecordZone.ID)] {
+        let sharedZones = try await sharedDB.allRecordZones()
+        guard !sharedZones.isEmpty else { return [] }
+
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let predicate = NSPredicate(format: "date >= %@", yesterday as NSDate)
-        let query = CKQuery(recordType: "SleepScore", predicate: predicate)
-        let results = try await sharedDB.records(matching: query)
-        var latestByMember: [String: (FamilyMember, DailySleepScore)] = [:]
-        for result in results.matchResults {
-            guard let record = try? result.1.get(),
-                  let memberID = record["memberID"] as? String,
-                  let displayName = record["displayName"] as? String,
-                  let date = record["date"] as? Date,
-                  let score = record["score"] as? Double
-            else { continue }
-            let member = FamilyMember(
-                id: memberID,
-                displayName: displayName,
-                avatarColor: record["avatarColor"] as? String ?? "#5E5CE6",
-                avatarEmoji: record["avatarEmoji"] as? String,
-                isCurrentUser: false
-            )
-            let dailyScore = DailySleepScore(
-                id: record.recordID.recordName,
-                memberID: memberID,
-                date: date,
-                score: score,
-                sleepScore: record["sleepScore"] as? Double ?? 0,
-                recoveryScore: record["recoveryScore"] as? Double ?? 0,
-                totalSleepMinutes: record["totalSleepMinutes"] as? Int ?? 0,
-                primarySource: SleepIndicatorSource(rawValue: record["primarySource"] as? String ?? "") ?? .appleHealth
-            )
+        var latestByMember: [String: (FamilyMember, DailySleepScore, CKRecordZone.ID)] = [:]
 
-            if let existing = latestByMember[memberID], existing.1.date >= dailyScore.date {
-                continue
+        for zone in sharedZones {
+            let query = CKQuery(recordType: "SleepScore", predicate: predicate)
+            let results = try await sharedDB.records(matching: query, inZoneWith: zone.zoneID)
+
+            for result in results.matchResults {
+                guard let record = try? result.1.get(),
+                      let memberID = record["memberID"] as? String,
+                      let displayName = record["displayName"] as? String,
+                      let date = record["date"] as? Date,
+                      let score = record["score"] as? Double
+                else { continue }
+
+                let member = FamilyMember(
+                    id: memberID,
+                    displayName: displayName,
+                    avatarColor: record["avatarColor"] as? String ?? "#5E5CE6",
+                    avatarEmoji: record["avatarEmoji"] as? String,
+                    isCurrentUser: false
+                )
+                let dailyScore = DailySleepScore(
+                    id: record.recordID.recordName,
+                    memberID: memberID,
+                    date: date,
+                    score: score,
+                    sleepScore: record["sleepScore"] as? Double ?? 0,
+                    recoveryScore: record["recoveryScore"] as? Double ?? 0,
+                    totalSleepMinutes: record["totalSleepMinutes"] as? Int ?? 0,
+                    primarySource: SleepIndicatorSource(rawValue: record["primarySource"] as? String ?? "") ?? .appleHealth
+                )
+
+                if let existing = latestByMember[memberID], existing.1.date >= dailyScore.date {
+                    continue
+                }
+                latestByMember[memberID] = (member, dailyScore, zone.zoneID)
             }
-            latestByMember[memberID] = (member, dailyScore)
         }
+
         return Array(latestByMember.values)
+    }
+
+    /// Removes the caller's access to a shared zone (effectively "unfriending").
+    func removeSharedZone(_ zoneID: CKRecordZone.ID) async throws {
+        try await sharedDB.deleteRecordZone(withID: zoneID)
     }
 
     // MARK: - Helpers

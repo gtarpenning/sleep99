@@ -61,11 +61,11 @@ enum MetricRegistry {
               scoring: .higherIsBetter(hardMin: 10, idealMin: 60), // minutes; personal avg beats 60
               weight: 0.10, lowerIsBetter: false, hint: nil),
 
-        // Bedtime within 30 min of personal average = perfect; 2 hr off = 0.
+        // Bedtime within 30 min of personal average = perfect; 1.5 hr off = 0.
         // Value stored as hours-from-noon (e.g. 10 PM = 10.0, midnight = 12.0, 1 AM = 13.0).
         .init(name: "Bedtime Consistency",
               category: .sleepArchitecture,
-              scoring: .personalAverageDeadband(deadband: 0.5, hardMax: 2.0), // hours
+              scoring: .personalAverageDeadband(deadband: 0.5, hardMax: 1.5), // hours
               weight: 0.10, lowerIsBetter: false,
               hint: "+/- 30 min of your usual bedtime is perfect"),
 

@@ -10,6 +10,7 @@ struct ScoreHeroView: View {
     let hrDeviation: Double
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
+    var isLoading: Bool = false
     private let daySwipeThreshold: CGFloat = 56
 
     private var scoreInt: Int { Int(summary.score.rounded()) }
@@ -109,18 +110,26 @@ struct ScoreHeroView: View {
 
     private var scoreLabel: some View {
         VStack(spacing: 4) {
-            Text("\(scoreInt)")
-                .font(.system(size: 80, weight: .bold, design: .rounded))
-                .foregroundStyle(scoreColor)
-                .contentTransition(.numericText())
+            if isLoading {
+                ProgressView()
+                    .tint(DS.purple)
+                    .scaleEffect(1.4)
+                    .frame(height: 80)
+            } else {
+                Text("\(scoreInt)")
+                    .font(.system(size: 80, weight: .bold, design: .rounded))
+                    .foregroundStyle(scoreColor)
+                    .contentTransition(.numericText())
+            }
 
-            Text(DS.scoreLabel(for: summary.score))
+            Text(isLoading ? "Calculating…" : DS.scoreLabel(for: summary.score))
                 .font(.caption.weight(.semibold))
                 .tracking(1.4)
                 .textCase(.uppercase)
-                .foregroundStyle(scoreColor.opacity(0.65))
+                .foregroundStyle(isLoading ? DS.textTertiary : scoreColor.opacity(0.65))
         }
         .animation(.spring(duration: 0.5), value: scoreInt)
+        .animation(.easeInOut(duration: 0.3), value: isLoading)
     }
 
     private var subScorePills: some View {

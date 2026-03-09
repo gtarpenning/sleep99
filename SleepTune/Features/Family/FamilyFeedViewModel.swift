@@ -11,6 +11,8 @@ final class FamilyFeedViewModel {
     var selectedDate: Date = Date()
     var isLoading: Bool = false
     var shareError: String?
+    /// Maps memberID → sharedDB zone, so we know which zone to delete when removing a friend.
+    private var memberZones: [String: CKRecordZone.ID] = [:]
 
     private let authService: AuthService
     private let cloudKitService: CloudKitService
@@ -37,7 +39,7 @@ final class FamilyFeedViewModel {
         defer { isLoading = false }
 
         do {
-            let pairs = try await cloudKitService.fetchGroupData()
+            let triples = try await cloudKitService.fetchGroupData()
             let myID = authService.userID ?? "me"
             let myName = authService.displayName ?? "You"
 
@@ -45,16 +47,29 @@ final class FamilyFeedViewModel {
                 FamilyMember(id: myID, displayName: myName, avatarColor: "#5E5CE6", avatarEmoji: authService.avatarEmoji, isCurrentUser: true)
             ]
             var newScores: [String: DailySleepScore] = [:]
+            var newZones: [String: CKRecordZone.ID] = [:]
 
-            for (member, score) in pairs where member.id != myID {
+            for (member, score, zoneID) in triples where member.id != myID {
                 newMembers.append(member)
                 newScores[score.memberID] = score
+                newZones[member.id] = zoneID
             }
 
             members = newMembers
             scores = newScores
+            memberZones = newZones
         } catch {
             // Silently fail — stub data remains
+        }
+    }
+
+    func removeMember(_ member: FamilyMember) {
+        members.removeAll { $0.id == member.id }
+        scores.removeValue(forKey: member.id)
+
+        guard let zoneID = memberZones.removeValue(forKey: member.id) else { return }
+        Task {
+            try? await cloudKitService.removeSharedZone(zoneID)
         }
     }
 
@@ -71,11 +86,15 @@ final class FamilyFeedViewModel {
         guard let score = currentUserScore else {
             throw ShareError.noScore
         }
+        guard let trimmedName = authService.displayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmedName.isEmpty else {
+            throw ShareError.noName
+        }
         return try await cloudKitService.prepareShare(
             score.toSummary(),
             totalMinutes: score.totalSleepMinutes,
             userID: userID,
-            displayName: authService.displayName ?? "Me",
+            displayName: trimmedName,
             avatarColor: "#5E5CE6",
             avatarEmoji: authService.avatarEmoji
         )
@@ -85,6 +104,11 @@ final class FamilyFeedViewModel {
     func canShareOrSetError() -> Bool {
         if !authService.isSignedIn {
             shareError = "Sign in with Apple to share your score."
+            return false
+        }
+        let trimmedName = authService.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName == nil || trimmedName!.isEmpty {
+            shareError = "Add your name in Settings → Account before sharing."
             return false
         }
         if currentUserScore == nil {
@@ -98,11 +122,13 @@ final class FamilyFeedViewModel {
 enum ShareError: LocalizedError {
     case notSignedIn
     case noScore
+    case noName
 
     var errorDescription: String? {
         switch self {
         case .notSignedIn: return "Sign in with Apple to share your score."
         case .noScore:     return "Open the Sleep tab and let your score load first."
+        case .noName:      return "Add your name in Settings → Account before sharing."
         }
     }
 }

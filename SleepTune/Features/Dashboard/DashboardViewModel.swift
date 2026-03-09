@@ -78,19 +78,21 @@ final class DashboardViewModel {
         let stored = await localStore.loadIndicators(for: selectedDate)
         if !stored.isEmpty {
             indicators = stored
+            // Load all supporting data concurrently before touching the score.
             await loadTrendHistory()
             await refreshLastNightData()
             await loadMonthlyStats()
-            // Recalculate after monthly stats are loaded so personal baselines are applied.
-            recalculateScore()
 
-            // Cached indicators can be stale from older parsing logic.
-            // If live stage-derived duration is far from the cached duration, refetch this day.
+            // If live stages show the cached duration is significantly off, refetch and show
+            // only that single corrected score. Otherwise score once from cache.
+            // Either way the score is set exactly ONCE — no A→B flicker.
             if shouldRefreshCachedIndicators() {
                 await refreshFromHealthKit()
+            } else {
+                recalculateScore()
             }
         } else {
-            // No cache — fetch from HealthKit
+            // No cache — fetch from HealthKit (also handles monthly stats + score inside).
             await refreshFromHealthKit()
         }
     }
@@ -115,13 +117,16 @@ final class DashboardViewModel {
                 indicators = fetched
                 await localStore.saveIndicators(fetched, for: selectedDate)
             }
+            // Monthly stats must be loaded BEFORE scoring so personal baselines are applied.
+            // This is the single place the score is set in this path.
+            await loadMonthlyStats()
             recalculateScore()
             await refreshLastNightData()
             await loadTrendHistory()
-            await loadMonthlyStats()
         } catch {
             authorizationState = await healthKitClient.authorizationState()
             if authorizationState == .authorized {
+                await loadMonthlyStats()
                 recalculateScore()
                 await refreshLastNightData()
             } else {

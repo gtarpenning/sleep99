@@ -12,9 +12,17 @@ struct SleepScoreEngine {
         let overall = (sleepScore * weights.architectureWeight +
                        recoveryScore * weights.recoveryWeight) * 100
 
+        // Hard cap: < 8 hours of sleep → overall score is capped proportionally.
+        // At 8h the cap is 99 (no effect). Each 30 min short drops the ceiling by ~6 pts.
+        // e.g. 7.5h → cap 92, 7h → cap 86, 6h → cap 74.
+        let sleepHours = indicators.first(where: { $0.name == "Sleep Duration" })?.value ?? 8
+        let sleepCap = sleepHours >= 8 ? 99.0 : (sleepHours / 8.0) * 99.0
+
+        let capped = min(overall, sleepCap)
+
         return SleepScoreSummary(
             date: Date(),
-            score:         min(max(overall.rounded(.up), 0), 99),
+            score:         min(max(capped.rounded(.up), 0), 99),
             trend:         0,
             sleepScore:    min(max(sleepScore * 100, 0), 99),
             recoveryScore: min(max(recoveryScore * 100, 0), 99),

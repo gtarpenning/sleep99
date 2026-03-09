@@ -45,9 +45,14 @@ struct FamilyMemberRowView: View {
                     ScoreChip(label: "Recover", value: score.recoveryScore, text: nil, width: 36)
                 }
             } else {
-                Text("—")
-                    .font(.title2)
-                    .foregroundStyle(DS.textTertiary)
+                VStack(spacing: 2) {
+                    Text("😴")
+                        .font(.title2)
+                    Text(member.isCurrentUser ? "No data" : "Not checked in")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(DS.textTertiary)
+                }
+                .opacity(0.6)
             }
         }
         .padding(.vertical, 8)

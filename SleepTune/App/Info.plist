@@ -17,13 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.1</string>
+	<string>2.2</string>
 	<key>CFBundleVersion</key>
-	<string>4</string>
-	<key>CKSharingSupported</key>
-	<true/>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.healthcare-fitness</string>
+	<string>1</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>sleeptune reads your sleep and recovery signals to calculate your sleep score.</string>
 	<key>NSHealthUpdateUsageDescription</key>
