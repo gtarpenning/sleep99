@@ -13,9 +13,11 @@ platform :ios do
     )
 
     match(
-      type:    "appstore",
-      readonly: true,
-      api_key: api_key
+      type:              "appstore",
+      readonly:          true,
+      api_key:           api_key,
+      keychain_name:     "build.keychain",
+      keychain_password: ""
     )
 
     current_build = latest_testflight_build_number(
@@ -28,20 +30,21 @@ platform :ios do
     )
 
     gym(
-      scheme:            "SleepTune",
-      project:           "SleepTune.xcodeproj",
-      configuration:     "Release",
-      export_method:     "app-store",
-      output_directory:  "./build_output",
-      output_name:       "SleepTune.ipa",
-      clean:             true,
+      scheme:           "SleepTune",
+      project:          "SleepTune.xcodeproj",
+      configuration:    "Release",
+      export_method:    "app-store",
+      output_directory: "./build_output",
+      output_name:      "SleepTune.ipa",
+      clean:            true,
+      xcargs:           "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=JL39GTJ62X " \
+                        "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.sleep-tune.app' " \
+                        "OTHER_CODE_SIGN_FLAGS='--keychain build.keychain'",
       export_options: {
         method:               "app-store",
         teamID:               "JL39GTJ62X",
-        provisioningProfiles: {
-          "com.sleep-tune.app" => "match AppStore com.sleep-tune.app"
-        },
-        signingStyle: "manual"
+        provisioningProfiles: { "com.sleep-tune.app" => "match AppStore com.sleep-tune.app" },
+        signingStyle:         "manual"
       }
     )
 
