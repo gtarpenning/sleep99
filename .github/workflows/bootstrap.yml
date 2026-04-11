@@ -1,0 +1,33 @@
+name: Bootstrap Certs (run once)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    name: Generate dist cert + provisioning profile
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH agent (match certs repo)
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_DEPLOY_KEY }}
+
+      - name: Ruby + Bundler
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Bootstrap certs
+        env:
+          ASC_KEY_ID:      ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:   ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_PASSWORD:  ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL:   git@github.com:gtarpenning/sleep-tune-certs.git
+        run: bundle exec fastlane bootstrap_certs
