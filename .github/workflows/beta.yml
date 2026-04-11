@@ -47,6 +47,12 @@ jobs:
           security unlock-keychain -p "" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
 
+      - name: Configure git credentials
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+          git config --global user.name "ci-bot"
+          git config --global user.email "ci@sleep-tune.app"
+
       - name: Fastlane beta
         env:
           ASC_KEY_ID:       ${{ secrets.ASC_KEY_ID }}
