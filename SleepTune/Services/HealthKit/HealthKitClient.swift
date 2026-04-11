@@ -398,7 +398,13 @@ private extension HealthKitClient {
             guard duration >= longAwakeningThreshold else { return false }
             let hasAsleepBefore = asleepSamples.contains { $0.endDate <= sample.startDate }
             let hasAsleepAfter = asleepSamples.contains { $0.startDate >= sample.endDate }
-            return hasAsleepBefore && hasAsleepAfter
+            guard hasAsleepBefore && hasAsleepAfter else { return false }
+            // Only penalize awakenings in the first 8h of sleep.
+            // Awakenings after 8h of accumulated sleep are not counted.
+            let sleepBeforeAwakening = unionSleepSeconds(
+                from: samples.filter { $0.endDate <= sample.startDate }
+            ) { v in v == .asleepUnspecified || v == .asleepREM || v == .asleepCore || v == .asleepDeep }
+            return sleepBeforeAwakening < 8 * 3600
         }
 
         // Use interval union to avoid double-counting when multiple sources (e.g. Oura + Apple Watch)

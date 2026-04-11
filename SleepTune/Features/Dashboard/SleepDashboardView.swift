@@ -67,7 +67,8 @@ struct SleepDashboardView: View {
                     hrDeviation: hrDeviationFromBaseline,
                     onPreviousDay: { shiftDate(by: -1) },
                     onNextDay: { shiftDate(by: 1) },
-                    isLoading: viewModel.isSyncing && viewModel.summary.score == 0
+                    isLoading: viewModel.isSyncing && viewModel.summary.score == 0,
+                    sleepInterval: viewModel.sleepInterval
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 8)

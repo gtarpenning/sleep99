@@ -18,8 +18,24 @@ final class DashboardViewModel {
     var trendRange: SleepScoreTrendRange
     var monthlyStats: [String: MetricStats] = [:]
 
-    /// Derived averages for use in scoreMetric() — computed from monthlyStats.
-    var monthlyAverages: [String: Double] { monthlyStats.mapValues(\.avg) }
+    /// Effective baselines for scoreMetric() — percentile-based for HR/HRV/RR,
+    /// monthly min for Lowest Overnight HR, avg for everything else.
+    var monthlyAverages: [String: Double] {
+        var result = monthlyStats.mapValues(\.avg)
+        if let s = monthlyStats["Lowest Overnight HR"]   { result["Lowest Overnight HR"]   = s.min }
+        if let s = monthlyStats["HRV"]                   { result["HRV"]                   = s.percentile(0.75) }
+        if let s = monthlyStats["Overnight Heart Rate"]  { result["Overnight Heart Rate"]  = s.percentile(0.10) }
+        if let s = monthlyStats["Respiratory Rate"]      { result["Respiratory Rate"]       = s.percentile(0.10) }
+        return result
+    }
+
+    /// Sleep window for the selected night, derived from stage data.
+    var sleepInterval: DateInterval? {
+        let asleep = lastNightStages.filter { $0.stage != .inBed && $0.stage != .awake }
+        guard let start = asleep.map(\.startDate).min(),
+              let end   = asleep.map(\.endDate).max() else { return nil }
+        return DateInterval(start: start, end: end)
+    }
 
     private let healthKitClient: HealthKitClient
     private let scoreEngine: SleepScoreEngine
@@ -203,10 +219,10 @@ final class DashboardViewModel {
             let userID = authService.userID,
             let displayName = authService.displayName
         else { return }
+        // Sleep Duration is in hours; convert to minutes for the family feed display.
         let totalMinutes = indicators
-            .filter { $0.category == .sleepArchitecture }
-            .first
-            .map { Int($0.value) } ?? 0
+            .first(where: { $0.name == "Sleep Duration" })
+            .map { Int($0.value * 60) } ?? 0
         do {
             try await cloudKitService.publishTodayScore(
                 summary,
@@ -337,22 +353,29 @@ final class DashboardViewModel {
     private func loadMonthlyStats() async {
         let cal = Calendar.current
         let today = Date()
-        var totals: [String: (sum: Double, min: Double, max: Double, count: Int)] = [:]
+        var totals: [String: (sum: Double, min: Double, max: Double, count: Int, values: [Double])] = [:]
         for offset in 1...30 {
             guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
             let cached = await localStore.loadIndicators(for: day)
             for indicator in cached {
-                var e = totals[indicator.name] ?? (0, .infinity, -.infinity, 0)
+                var e = totals[indicator.name] ?? (0, .infinity, -.infinity, 0, [])
                 e.sum   += indicator.value
                 e.min    = Swift.min(e.min, indicator.value)
                 e.max    = Swift.max(e.max, indicator.value)
                 e.count += 1
+                e.values.append(indicator.value)
                 totals[indicator.name] = e
             }
         }
         monthlyStats = totals.compactMapValues { t in
             guard t.count > 0, t.min != .infinity else { return nil }
-            return MetricStats(avg: t.sum / Double(t.count), min: t.min, max: t.max, count: t.count)
+            return MetricStats(
+                avg: t.sum / Double(t.count),
+                min: t.min,
+                max: t.max,
+                count: t.count,
+                sortedValues: t.values.sorted()
+            )
         }
     }
 

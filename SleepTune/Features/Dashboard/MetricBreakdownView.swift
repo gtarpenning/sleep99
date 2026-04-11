@@ -101,7 +101,7 @@ struct MetricBreakdownView: View {
                         ?? MetricRegistry.definition(for: indicator.name)
             let weight   = def?.weight ?? 0
             let stats    = monthlyStats[indicator.name]
-            let normalized = scoreMetric(name: indicator.name, value: indicator.value, monthlyAvg: stats?.avg) ?? 0
+            let normalized = scoreMetric(name: indicator.name, value: indicator.value, monthlyAvg: effectiveBaseline(name: indicator.name, stats: stats)) ?? 0
             let maxPts   = scoredTotal > 0 ? weight / scoredTotal * categoryWeight * 100 : 0
             let actualPts = normalized * maxPts
 

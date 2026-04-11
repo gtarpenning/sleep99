@@ -23,6 +23,22 @@ enum ScoringShape {
     case lowerIsBetterRelative(hardMaxDelta: Double, fallback: Double = 0.5)
 }
 
+// MARK: - Effective baseline
+
+/// Returns the baseline value used as the "perfect" reference for a metric,
+/// applying percentile overrides for HR/HRV/RR so the bar is set to best nights,
+/// not the average. Used by both the score engine and breakdown display.
+func effectiveBaseline(name: String, stats: MetricStats?) -> Double? {
+    guard let stats else { return nil }
+    switch name {
+    case "Lowest Overnight HR":   return stats.min
+    case "HRV":                   return stats.percentile(0.75)
+    case "Overnight Heart Rate",
+         "Respiratory Rate":      return stats.percentile(0.10)
+    default:                      return stats.avg
+    }
+}
+
 // MARK: - Scoring function
 
 /// Converts a raw value to a 0…1 score.
@@ -59,24 +75,33 @@ func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
     if let avg = monthlyAvg {
         switch name {
         case "Sleep Duration":
-            // At or above avg → 100%. -25% per hour below avg. 4h short → 0%.
+            // At or above baseline → 100%. -33% per hour below avg. 3h short → 0%.
             if value >= avg { return 1 }
-            return max(0, 1 - (avg - value) / 4.0)
+            return max(0, 1 - (avg - value) / 3.0)
+
+        case "Bedtime Consistency":
+            // One-sided: going to bed EARLIER than usual is never penalized.
+            // Going LATER: 30-min deadband, then decays to 0 at 1.5h late.
+            let delta = max(0, value - avg)
+            let deadband = 0.5
+            if delta <= deadband { return 1 }
+            return max(0, 1 - (delta - deadband) / 1.0)
 
         case "HRV":
-            // 10 ms below baseline -> 50% score. 20 ms below baseline -> ~0%.
+            // avg is p75 of the month (passed in via monthlyAverages override).
+            // At or above p75 → perfect. 20 ms below p75 → ~0%.
             if value >= avg { return 1 }
             return max(0, 1 - (avg - value) / 20)
 
         case "Overnight Heart Rate", "Lowest Overnight HR":
-            // -10% per bpm above personal avg. At or below = perfect.
-            // +3 bpm → 70%, +10 bpm → 0%.
+            // avg is p10 (best 10%) for Overnight HR; min for Lowest.
+            // At or below → perfect. -10% per bpm above target.
             if value <= avg { return 1 }
             return max(0, 1 - (value - avg) * 0.10)
 
         case "Respiratory Rate":
-            // Very sensitive: +0.2 br/min above avg = -30%. At or below = perfect.
-            // Slope: 1.5 per br/min → 0.3 penalty per 0.2 br/min.
+            // avg is p10 (best 10% / lowest readings) for respiratory rate.
+            // At or below → perfect. Very sensitive: +0.2 br/min = -30%.
             if value <= avg { return 1 }
             return max(0, 1 - (value - avg) * 1.5)
 

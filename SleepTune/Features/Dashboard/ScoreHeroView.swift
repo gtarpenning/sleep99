@@ -11,6 +11,8 @@ struct ScoreHeroView: View {
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
     var isLoading: Bool = false
+    /// Sleep window for the selected night — shown as "11:32 PM — 7:45 AM".
+    var sleepInterval: DateInterval? = nil
     private let daySwipeThreshold: CGFloat = 56
 
     private var scoreInt: Int { Int(summary.score.rounded()) }
@@ -59,9 +61,15 @@ struct ScoreHeroView: View {
             // Doppler Stripe — full width hero
             DopplerStripeView(bins: bins, score: summary.score, height: 36)
 
-            // Sub-score pills
-            subScorePills
-                .padding(.top, 16)
+            // Sleep window or sub-score pills
+            Group {
+                if let interval = sleepInterval, !isLoading {
+                    sleepWindowDisplay(interval: interval)
+                } else {
+                    subScorePills
+                }
+            }
+            .padding(.top, 16)
         }
         .contentShape(.rect)
         .gesture(
@@ -130,6 +138,41 @@ struct ScoreHeroView: View {
         }
         .animation(.spring(duration: 0.5), value: scoreInt)
         .animation(.easeInOut(duration: 0.3), value: isLoading)
+    }
+
+    private func sleepWindowDisplay(interval: DateInterval) -> some View {
+        let startStr = formatTime(interval.start)
+        let endStr   = formatTime(interval.end)
+        let hours    = Int(interval.duration / 3600)
+        let minutes  = Int((interval.duration.truncatingRemainder(dividingBy: 3600)) / 60)
+        let durationStr = minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+
+        return HStack(spacing: 0) {
+            Image(systemName: "moon.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(DS.purple)
+                .padding(.trailing, 6)
+            Text("\(startStr) — \(endStr)")
+                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .foregroundStyle(DS.textPrimary)
+            Text("  ·  \(durationStr)")
+                .font(.system(.caption, design: .rounded, weight: .medium))
+                .foregroundStyle(DS.textSecondary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 11)
+        .background(DS.surface, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(DS.border, lineWidth: 0.5))
+        .frame(maxWidth: .infinity)
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let cal = Calendar.current
+        let h   = cal.component(.hour,   from: date)
+        let m   = cal.component(.minute, from: date)
+        let isPM    = h >= 12
+        let displayH = h == 0 ? 12 : h > 12 ? h - 12 : h
+        return String(format: "%d:%02d %@", displayH, m, isPM ? "pm" : "am")
     }
 
     private var subScorePills: some View {

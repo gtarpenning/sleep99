@@ -9,6 +9,28 @@ struct MetricStats: Sendable {
     let max: Double
     /// Number of nights contributing to these stats.
     let count: Int
+    /// Raw values sorted ascending — used for percentile-based scoring thresholds.
+    let sortedValues: [Double]
+
+    init(avg: Double, min: Double, max: Double, count: Int, sortedValues: [Double] = []) {
+        self.avg = avg
+        self.min = min
+        self.max = max
+        self.count = count
+        self.sortedValues = sortedValues
+    }
+
+    /// Returns the value at the given percentile (0.0–1.0) using linear interpolation.
+    /// Falls back to `avg` when fewer than 2 data points are available.
+    func percentile(_ p: Double) -> Double {
+        guard sortedValues.count >= 2 else { return avg }
+        let clamped = Swift.max(0, Swift.min(1, p))
+        let idx = clamped * Double(sortedValues.count - 1)
+        let lo = Int(idx)
+        let hi = Swift.min(lo + 1, sortedValues.count - 1)
+        let frac = idx - Double(lo)
+        return sortedValues[lo] * (1 - frac) + sortedValues[hi] * frac
+    }
 
     /// 0–1 position of `value` within the observed min–max range.
     /// Used for placing a marker on a range bar.

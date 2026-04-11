@@ -10,7 +10,10 @@ struct AppRootView: View {
 
             FamilyFeedView(viewModel: container.familyFeedViewModel)
                 .tabItem { Label("Family", systemImage: "person.2.fill") }
-                .onAppear { syncCurrentUserScore() }
+                .onAppear {
+                    syncCurrentUserScore()
+                    Task { await container.familyFeedViewModel.refresh() }
+                }
                 .onChange(of: container.dashboardViewModel.summary.score) { _, _ in syncCurrentUserScore() }
 
             NavigationStack {
