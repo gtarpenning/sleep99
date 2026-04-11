@@ -13,11 +13,9 @@ platform :ios do
     )
 
     match(
-      type:              "appstore",
-      readonly:          true,
-      api_key:           api_key,
-      keychain_name:     "build.keychain",
-      keychain_password: ""
+      type:     "appstore",
+      readonly: true,
+      api_key:  api_key
     )
 
     current_build = latest_testflight_build_number(
@@ -38,8 +36,8 @@ platform :ios do
       output_name:      "SleepTune.ipa",
       clean:            true,
       xcargs:           "CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=JL39GTJ62X " \
-                        "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.sleep-tune.app' " \
-                        "OTHER_CODE_SIGN_FLAGS='--keychain build.keychain'",
+                        "CODE_SIGN_IDENTITY='Apple Distribution' " \
+                        "PROVISIONING_PROFILE_SPECIFIER='match AppStore com.sleep-tune.app'",
       export_options: {
         method:               "app-store",
         teamID:               "JL39GTJ62X",
