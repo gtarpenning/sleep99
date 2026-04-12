@@ -26,6 +26,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Disable osxkeychain credential helper
+        run: git config --global credential.helper ""
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
