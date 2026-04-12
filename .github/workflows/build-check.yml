@@ -1,0 +1,37 @@
+name: Build Check
+
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  pull_request:
+
+concurrency:
+  group: build-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compile
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - name: Disable osxkeychain credential helper
+        run: git config --global credential.helper ""
+
+      - uses: actions/checkout@v4
+
+      - name: Compile (no signing)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project SleepTune.xcodeproj \
+            -scheme SleepTune \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | xcbeautify --quiet
