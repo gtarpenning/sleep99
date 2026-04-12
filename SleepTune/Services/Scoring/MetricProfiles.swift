@@ -23,6 +23,11 @@ enum ScoringShape {
     case lowerIsBetterRelative(hardMaxDelta: Double, fallback: Double = 0.5)
 }
 
+struct MetricTargetGuidance: Sendable, Equatable {
+    let value: Double
+    let label: String
+}
+
 // MARK: - Effective baseline
 
 /// Returns the baseline value used as the "perfect" reference for a metric,
@@ -36,6 +41,32 @@ func effectiveBaseline(name: String, stats: MetricStats?) -> Double? {
     case "Overnight Heart Rate",
          "Respiratory Rate":      return stats.percentile(0.10)
     default:                      return stats.avg
+    }
+}
+
+/// Returns extra user-facing guidance for metrics whose "perfect" target comes from
+/// percentile-based personal history rather than a plain average.
+func metricTargetGuidance(name: String, stats: MetricStats?) -> MetricTargetGuidance? {
+    guard let stats else { return nil }
+
+    switch name {
+    case "Lowest Overnight HR":
+        return MetricTargetGuidance(
+            value: stats.min,
+            label: "Target set by your lowest night in the last 30."
+        )
+    case "HRV":
+        return MetricTargetGuidance(
+            value: stats.percentile(0.75),
+            label: "Target set by your top quartile nights over the last 30."
+        )
+    case "Overnight Heart Rate", "Respiratory Rate":
+        return MetricTargetGuidance(
+            value: stats.percentile(0.10),
+            label: "Target set by your best 10% of nights over the last 30."
+        )
+    default:
+        return nil
     }
 }
 

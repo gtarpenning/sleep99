@@ -14,6 +14,7 @@ struct MetricContribution: Identifiable {
     let lowerIsBetter: Bool
     let hint: String?            // static directional hint from MetricDefinition
     let stats: MetricStats?      // 30-day stats; nil for new users
+    let target: MetricTargetGuidance?
     let category: SleepIndicatorCategory
 
     /// Display-only contribution used in the expanded breakdown.
@@ -101,6 +102,7 @@ struct MetricBreakdownView: View {
                         ?? MetricRegistry.definition(for: indicator.name)
             let weight   = def?.weight ?? 0
             let stats    = monthlyStats[indicator.name]
+            let target   = metricTargetGuidance(name: indicator.name, stats: stats)
             let normalized = scoreMetric(name: indicator.name, value: indicator.value, monthlyAvg: effectiveBaseline(name: indicator.name, stats: stats)) ?? 0
             let maxPts   = scoredTotal > 0 ? weight / scoredTotal * categoryWeight * 100 : 0
             let actualPts = normalized * maxPts
@@ -108,7 +110,7 @@ struct MetricBreakdownView: View {
             return MetricContribution(
                 id: indicator.name,
                 name: indicator.name,
-                formattedValue: formatted(value: indicator.value, unit: indicator.unit),
+                formattedValue: formatted(value: indicator.value, unit: indicator.unit, metricName: indicator.name),
                 rawValue: indicator.value,
                 unit: indicator.unit,
                 normalizedScore: normalized * 100,
@@ -117,6 +119,7 @@ struct MetricBreakdownView: View {
                 lowerIsBetter: def?.lowerIsBetter ?? false,
                 hint: def?.hint,
                 stats: stats,
+                target: target,
                 category: category
             )
         }
@@ -136,18 +139,19 @@ struct MetricBreakdownView: View {
 
 // MARK: - Value Formatting
 
-func formatted(value: Double, unit: String) -> String {
+func formatted(value: Double, unit: String, metricName: String? = nil) -> String {
     switch unit {
     case "hr":
         return "\(Int(value))h \(Int((value - Double(Int(value))) * 60))m"
     case "%":
-        return String(format: "%.0f%%", value)
+        let precision = metricName == "Blood Oxygen" ? 1 : 0
+        return "\(value.formatted(.number.precision(.fractionLength(precision))))%"
     case "ms", "bpm", "min":
         return "\(Int(value.rounded())) \(unit)"
     case "br/min":
         return "\(value.formatted(.number.precision(.fractionLength(1)))) br/min"
     case "fraction":
-        return String(format: "%.2f", value)
+        return value.formatted(.number.precision(.fractionLength(2)))
     case "bedtime":
         // value = hours from noon (10 PM = 10.0, midnight = 12.0, 1 AM = 13.0)
         let minutesFromMidnight = (Int((value * 60).rounded()) + 12 * 60) % (24 * 60)
@@ -155,9 +159,9 @@ func formatted(value: Double, unit: String) -> String {
         let m = minutesFromMidnight % 60
         let ampm = h < 12 ? "AM" : "PM"
         let displayH = h == 0 ? 12 : h > 12 ? h - 12 : h
-        return String(format: "%d:%02d %@", displayH, m, ampm)
+        return "\(displayH):\(m.formatted(.number.precision(.integerLength(2)))) \(ampm)"
     default:
-        return String(format: "%.1f \(unit)", value)
+        return "\(value.formatted(.number.precision(.fractionLength(1)))) \(unit)"
     }
 }
 
@@ -230,7 +234,7 @@ struct MetricCategorySection: View {
                     .padding(.horizontal, 16)
 
                 VStack(spacing: 0) {
-                    ForEach(Array(metrics.enumerated()), id: \.element.id) { idx, metric in
+                    ForEach(metrics.enumerated(), id: \.element.id) { idx, metric in
                         MetricContributionRow(metric: metric)
 
                         if idx < metrics.count - 1 {
@@ -263,14 +267,14 @@ struct MetricContributionRow: View {
     /// Subtitle: show actual 30d average (transparent) + delta tonight; fall back to static hint.
     private var subtitle: (text: String, color: Color)? {
         if let stats = metric.stats, stats.count > 0 {
-            let avgText = "avg \(compactValueText(value: stats.avg, unit: metric.unit))"
+            let avgText = "avg \(compactValueText(value: stats.avg, unit: metric.unit, metricName: metric.name))"
             let delta = metric.rawValue - stats.avg
             let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
             if abs(delta) < threshold {
                 return (avgText, DS.textTertiary)
             }
             // Build delta string
-            let deltaText = compactDeltaText(delta: delta, unit: metric.unit)
+            let deltaText = compactDeltaText(delta: delta, unit: metric.unit, metricName: metric.name)
             return ("\(avgText) (\(deltaText) tonight)", DS.textTertiary)
         } else if let hint = metric.hint {
             return (hint, DS.textTertiary)
@@ -278,14 +282,15 @@ struct MetricContributionRow: View {
         return nil
     }
 
-    private func compactValueText(value: Double, unit: String) -> String {
+    private func compactValueText(value: Double, unit: String, metricName: String) -> String {
         switch unit {
         case "ms", "bpm", "min":
             return "\(Int(value.rounded()))\(unit)"
         case "br/min":
             return "\(value.formatted(.number.precision(.fractionLength(1))))br/min"
         case "%":
-            return "\(Int(value.rounded()))%"
+            let precision = metricName == "Blood Oxygen" ? 1 : 0
+            return "\(value.formatted(.number.precision(.fractionLength(precision))))%"
         case "fraction":
             return value.formatted(.number.precision(.fractionLength(2)))
         case "hr":
@@ -293,11 +298,11 @@ struct MetricContributionRow: View {
             let minutes = Int((value - Double(hours)) * 60)
             return "\(hours)h \(minutes)m"
         default:
-            return formatted(value: value, unit: unit)
+            return formatted(value: value, unit: unit, metricName: metricName)
         }
     }
 
-    private func compactDeltaText(delta: Double, unit: String) -> String {
+    private func compactDeltaText(delta: Double, unit: String, metricName: String) -> String {
         let prefix = delta > 0 ? "+" : "-"
 
         switch unit {
@@ -307,7 +312,8 @@ struct MetricContributionRow: View {
         case "br/min":
             return "\(prefix)\(abs(delta).formatted(.number.precision(.fractionLength(1))))br/min"
         case "%":
-            return "\(prefix)\(Int(abs(delta).rounded()))%"
+            let precision = metricName == "Blood Oxygen" ? 1 : 0
+            return "\(prefix)\(abs(delta).formatted(.number.precision(.fractionLength(precision))))%"
         case "fraction":
             return "\(prefix)\(abs(delta).formatted(.number.precision(.fractionLength(2))))"
         default:

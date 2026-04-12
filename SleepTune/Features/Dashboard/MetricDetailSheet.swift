@@ -12,6 +12,9 @@ struct MetricDetailSheet: View {
                 ScrollView {
                     VStack(spacing: 32) {
                         currentValueSection
+                        if let target = metric.target {
+                            targetSection(target: target)
+                        }
                         if let stats = metric.stats {
                             rangeSection(stats: stats)
                             statsGrid(stats: stats)
@@ -64,6 +67,43 @@ struct MetricDetailSheet: View {
 
     // MARK: - 30d range bar
 
+    private func targetSection(target: MetricTargetGuidance) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Perfect-Score Target")
+                .font(.caption.weight(.semibold))
+                .tracking(0.8)
+                .textCase(.uppercase)
+                .foregroundStyle(DS.textTertiary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(formatted(value: target.value, unit: metric.unit, metricName: metric.name))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(DS.textPrimary)
+                    .monospacedDigit()
+
+                Text(target.label)
+                    .font(.caption)
+                    .foregroundStyle(DS.textSecondary)
+            }
+
+            HStack(spacing: 10) {
+                statCell(
+                    value: targetDeltaText(target: target),
+                    label: "vs target",
+                    valueColor: targetDeltaColor(target: target)
+                )
+                statCell(
+                    value: pointsText,
+                    label: "pts tonight",
+                    valueColor: pointColor
+                )
+            }
+        }
+        .padding(20)
+        .background(DS.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(DS.border, lineWidth: 0.5))
+    }
+
     private func rangeSection(stats: MetricStats) -> some View {
         let accent = rangeAccentColor(stats: stats)
 
@@ -107,12 +147,12 @@ struct MetricDetailSheet: View {
 
             // Min / avg / max labels
             HStack {
-                rangeLabel(formatted(value: stats.min, unit: metric.unit), subtitle: "30d low")
+                rangeLabel(formatted(value: stats.min, unit: metric.unit, metricName: metric.name), subtitle: "30d low")
                 Spacer()
-                rangeLabel(formatted(value: stats.avg, unit: metric.unit), subtitle: "30d avg")
+                rangeLabel(formatted(value: stats.avg, unit: metric.unit, metricName: metric.name), subtitle: "30d avg")
                     .frame(maxWidth: .infinity)
                 Spacer()
-                rangeLabel(formatted(value: stats.max, unit: metric.unit), subtitle: "30d high")
+                rangeLabel(formatted(value: stats.max, unit: metric.unit, metricName: metric.name), subtitle: "30d high")
             }
         }
         .padding(20)
@@ -136,14 +176,9 @@ struct MetricDetailSheet: View {
     // MARK: - Stats grid
 
     private func statsGrid(stats: MetricStats) -> some View {
-        let ptsValue = String(
-            format: "%.1f/%.1f",
-            metric.displayedPointContribution,
-            metric.displayedMaxPointContribution
-        )
         return HStack(spacing: 10) {
             statCell(
-                value: formatted(value: metric.rawValue - stats.avg, unit: metric.unit, signed: true),
+                value: formatted(value: metric.rawValue - stats.avg, unit: metric.unit, signed: true, metricName: metric.name),
                 label: "vs avg",
                 valueColor: isAtOrBetterThanAverage(avg: stats.avg) ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
             )
@@ -153,9 +188,9 @@ struct MetricDetailSheet: View {
                 valueColor: DS.textPrimary
             )
             statCell(
-                value: ptsValue,
+                value: pointsText,
                 label: "pts",
-                valueColor: metric.normalizedScore >= 75 ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
+                valueColor: pointColor
             )
         }
     }
@@ -203,7 +238,7 @@ struct MetricDetailSheet: View {
             let delta = metric.rawValue - stats.avg
             let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
             guard abs(delta) >= threshold else { return nil }
-            let deltaStr = formatted(value: delta, unit: metric.unit, signed: true)
+            let deltaStr = formatted(value: delta, unit: metric.unit, signed: true, metricName: metric.name)
             let direction = delta > 0 ? "above" : "below"
             return "\(deltaStr) \(direction) your average"
         }
@@ -236,24 +271,61 @@ struct MetricDetailSheet: View {
             return 0.5
         }
     }
+
+    private var pointsText: String {
+        let tonight = metric.displayedPointContribution.formatted(.number.precision(.fractionLength(1)))
+        let max = metric.displayedMaxPointContribution.formatted(.number.precision(.fractionLength(1)))
+        return "\(tonight)/\(max)"
+    }
+
+    private var pointColor: Color {
+        metric.normalizedScore >= 75 ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
+    }
+
+    private func targetDeltaText(target: MetricTargetGuidance) -> String {
+        let delta = metric.rawValue - target.value
+        if abs(delta) < baselineThreshold(for: metric.unit) {
+            return "On target"
+        }
+        return formatted(value: delta, unit: metric.unit, signed: true, metricName: metric.name)
+    }
+
+    private func targetDeltaColor(target: MetricTargetGuidance) -> Color {
+        let delta = metric.rawValue - target.value
+        if abs(delta) < baselineThreshold(for: metric.unit) {
+            return DS.green
+        }
+        if metric.lowerIsBetter {
+            return delta <= 0 ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
+        }
+        return delta >= 0 ? DS.green : Color(red: 1.0, green: 0.62, blue: 0.04)
+    }
 }
 
 // MARK: - Signed formatting helper
 
-private func formatted(value: Double, unit: String, signed: Bool) -> String {
-    let prefix = signed && value > 0 ? "+" : ""
+private func formatted(value: Double, unit: String, signed: Bool, metricName: String? = nil) -> String {
+    let absoluteValue = abs(value)
+    let prefix: String
+    if signed {
+        prefix = value > 0 ? "+" : value < 0 ? "-" : ""
+    } else {
+        prefix = ""
+    }
+
     switch unit {
     case "hr":
-        let mins = Int(abs(value) * 60)
-        return "\(value < 0 ? "-" : "+")\(mins)m"
+        let mins = Int((absoluteValue * 60).rounded())
+        return "\(prefix)\(mins)m"
     case "%":
-        return "\(prefix)\(String(format: "%.0f", value))%"
+        let precision = metricName == "Blood Oxygen" ? 1 : 0
+        return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(precision))))%"
     case "fraction":
-        return "\(prefix)\(String(format: "%.2f", value))"
+        return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(2))))"
     case "ms", "bpm", "min":
-        return "\(prefix)\(Int(abs(value).rounded())) \(unit)"
+        return "\(prefix)\(Int(absoluteValue.rounded())) \(unit)"
     default:
-        return "\(prefix)\(String(format: "%.1f", value)) \(unit)"
+        return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(1)))) \(unit)"
     }
 }
 
