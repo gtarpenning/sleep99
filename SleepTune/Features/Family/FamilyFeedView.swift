@@ -45,7 +45,9 @@ struct FamilyFeedView: View {
                     }
                 }
             }
-            .task { await viewModel.refresh() }
+            .onAppear {
+                Task { await viewModel.refresh() }
+            }
             .refreshable {
                 await viewModel.refresh()
             }

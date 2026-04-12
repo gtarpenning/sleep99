@@ -244,7 +244,12 @@ actor CloudKitService {
                     score: score,
                     sleepScore: record["sleepScore"] as? Double ?? 0,
                     recoveryScore: record["recoveryScore"] as? Double ?? 0,
-                    totalSleepMinutes: record["totalSleepMinutes"] as? Int ?? 0,
+                    totalSleepMinutes: {
+                        let raw = record["totalSleepMinutes"] as? Int ?? 0
+                        // Back-compat: old builds stored hours (e.g. 7) instead of minutes (420).
+                        // Values < 60 are impossible as real sleep minutes so treat them as hours.
+                        return raw < 60 && raw > 0 ? raw * 60 : raw
+                    }(),
                     primarySource: SleepIndicatorSource(rawValue: record["primarySource"] as? String ?? "") ?? .appleHealth
                 )
 
