@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>2.2</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>4</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>sleeptune reads your sleep and recovery signals to calculate your sleep score.</string>
 	<key>NSHealthUpdateUsageDescription</key>
