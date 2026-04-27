@@ -25,5 +25,9 @@ final class MockHealthKitClient: HealthKitClient {
     override func fetchSignals(for date: Date) async throws -> [SleepSignalSample] {
         MockSleepData.signals
     }
+
+    override func fetchActivitySnapshot(for date: Date) async -> DailyActivitySnapshot {
+        MockSleepData.activitySnapshot
+    }
 }
 #endif

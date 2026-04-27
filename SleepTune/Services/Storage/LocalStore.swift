@@ -6,18 +6,39 @@ protocol SleepLocalStore {
     func saveIndicators(_ indicators: [SleepIndicator], for date: Date) async
     func loadScores(from startDate: Date, to endDate: Date) async -> [SleepScoreTrendPoint]
     func saveScore(_ score: Double, sleepScore: Double, recoveryScore: Double, for date: Date) async
+    func loadActivitySnapshot(for date: Date) async -> DailyActivitySnapshot?
+    func saveActivitySnapshot(_ snapshot: DailyActivitySnapshot, for date: Date) async
 }
 
-// MARK: - In-memory store (used by mock/preview container — always returns empty so
-// MockHealthKitClient is always called instead of hitting stale UserDefaults cache)
+// MARK: - Mock store (used by mock/preview container)
+// Returns MockSleepData for any recent date so that load() populates monthly stats,
+// trend history, and insights correctly — no real UserDefaults reads/writes.
 
 #if DEBUG
 @MainActor
-final class InMemorySleepStore: SleepLocalStore {
-    func loadIndicators(for date: Date) async -> [SleepIndicator] { [] }
+final class MockSleepStore: SleepLocalStore {
+    func loadIndicators(for date: Date) async -> [SleepIndicator] {
+        let days = Calendar.current.dateComponents([.day], from: date.startOfDay, to: Date().startOfDay).day ?? 0
+        guard days >= 0, days < 60 else { return [] }
+        return MockSleepData.indicators
+    }
+
     func saveIndicators(_ indicators: [SleepIndicator], for date: Date) async {}
-    func loadScores(from startDate: Date, to endDate: Date) async -> [SleepScoreTrendPoint] { [] }
+
+    func loadScores(from startDate: Date, to endDate: Date) async -> [SleepScoreTrendPoint] {
+        let start = startDate.startOfDay
+        let end   = endDate.startOfDay
+        return MockSleepData.scoreHistory.filter { $0.date >= start && $0.date <= end }
+    }
+
     func saveScore(_ score: Double, sleepScore: Double, recoveryScore: Double, for date: Date) async {}
+
+    func loadActivitySnapshot(for date: Date) async -> DailyActivitySnapshot? {
+        // Return nil so loadActivityMonthlyStats() doesn't overwrite AppContainer.mock()-seeded stats.
+        nil
+    }
+
+    func saveActivitySnapshot(_ snapshot: DailyActivitySnapshot, for date: Date) async {}
 }
 #endif
 
@@ -91,6 +112,22 @@ final class UserDefaultsSleepStore: SleepLocalStore {
         saveValue(score,         forKey: key, inDictKey: "sleepScores")
         saveValue(sleepScore,    forKey: key, inDictKey: "sleepSubScores_sleep")
         saveValue(recoveryScore, forKey: key, inDictKey: "sleepSubScores_recovery")
+    }
+
+    // MARK: - Activity Snapshots
+
+    func loadActivitySnapshot(for date: Date) async -> DailyActivitySnapshot? {
+        let key = "activity_\(iso8601Formatter().string(from: date.startOfDay))"
+        guard let data = defaults.data(forKey: key),
+              let snapshot = try? decoder.decode(DailyActivitySnapshot.self, from: data)
+        else { return nil }
+        return snapshot
+    }
+
+    func saveActivitySnapshot(_ snapshot: DailyActivitySnapshot, for date: Date) async {
+        let key = "activity_\(iso8601Formatter().string(from: date.startOfDay))"
+        guard let data = try? encoder.encode(snapshot) else { return }
+        defaults.set(data, forKey: key)
     }
 
     // MARK: - Helpers

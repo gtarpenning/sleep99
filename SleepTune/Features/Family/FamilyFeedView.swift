@@ -12,6 +12,20 @@ struct FamilyFeedView: View {
                 DS.bg.ignoresSafeArea()
 
                 List {
+                    if viewModel.isLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .tint(DS.textTertiary)
+                                .scaleEffect(0.85)
+                            Text("Refreshing…")
+                                .font(.footnote)
+                                .foregroundStyle(DS.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 6)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
                     ForEach(sortedMembers) { member in
                         FamilyMemberRowView(
                             member: member,
@@ -19,6 +33,7 @@ struct FamilyFeedView: View {
                         )
                         .listRowBackground(DS.surface)
                         .listRowSeparatorTint(DS.border)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 14))
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             if !member.isCurrentUser {
                                 Button(role: .destructive) {
@@ -52,7 +67,7 @@ struct FamilyFeedView: View {
                 await viewModel.refresh()
             }
             .sheet(isPresented: $showInviteSheet) {
-                InviteSheet(makeShare: { try await viewModel.makeShare() })
+                InviteSheet(makeShareURL: { try await viewModel.makeShareURL() })
             }
             .alert("Could not share", isPresented: .init(
                 get: { viewModel.shareError != nil },
@@ -81,15 +96,16 @@ struct FamilyFeedView: View {
 
 // MARK: - Custom Invite Sheet
 
-/// Dark-themed invite sheet. Prepares a CKShare and presents UICloudSharingController,
-/// allowing CloudKit to generate and distribute the invite.
+/// Dark-themed invite sheet. Fetches the raw CloudKit share URL and presents a standard
+/// UIActivityViewController — bypassing UICloudSharingController which embeds the sender's
+/// build number and triggers an App Store version check that fails for TestFlight builds.
 private struct InviteSheet: View {
-    let makeShare: () async throws -> (CKShare, CKContainer)
+    let makeShareURL: () async throws -> URL
     @Environment(\.dismiss) private var dismiss
 
     @State private var isLoading = false
     @State private var errorMessage: String? = nil
-    @State private var pendingShare: WrappedShare? = nil  // non-nil triggers the share controller
+    @State private var pendingURL: ShareableURL? = nil  // non-nil triggers the share sheet
 
     var body: some View {
         ZStack {
@@ -161,7 +177,7 @@ private struct InviteSheet: View {
                             } else {
                                 HStack(spacing: 8) {
                                     Image(systemName: "message.fill")
-                                    Text(errorMessage != nil ? "Try Again" : "Share via iMessage")
+                                    Text(errorMessage != nil ? "Try Again" : "Share Invite Link")
                                         .fontWeight(.semibold)
                                 }
                             }
@@ -181,12 +197,8 @@ private struct InviteSheet: View {
         .colorScheme(.dark)
         .presentationDetents([.medium])
         .presentationBackground(DS.bg)
-        .sheet(item: $pendingShare, onDismiss: { dismiss() }) { wrapped in
-            CloudSharingView(
-                share: wrapped.share,
-                container: wrapped.container,
-                onSaveError: { message in errorMessage = message }
-            )
+        .sheet(item: $pendingURL, onDismiss: { dismiss() }) { wrapped in
+            ShareSheetView(url: wrapped.url)
         }
     }
 
@@ -197,8 +209,8 @@ private struct InviteSheet: View {
         defer { isLoading = false }
 
         do {
-            let (share, container) = try await makeShare()
-            pendingShare = WrappedShare(share: share, container: container)
+            let url = try await makeShareURL()
+            pendingURL = ShareableURL(url: url)
         } catch {
             errorMessage = friendlyError(error)
         }
@@ -233,43 +245,20 @@ private struct InviteSheet: View {
 
 // MARK: - Helpers
 
-private struct WrappedShare: Identifiable {
+private struct ShareableURL: Identifiable {
     let id = UUID()
-    let share: CKShare
-    let container: CKContainer
+    let url: URL
 }
 
-private struct CloudSharingView: UIViewControllerRepresentable {
-    let share: CKShare
-    let container: CKContainer
-    var onSaveError: (String) -> Void
+private struct ShareSheetView: UIViewControllerRepresentable {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
 
-    func makeUIViewController(context: Context) -> UICloudSharingController {
-        let controller = UICloudSharingController(share: share, container: container)
-        controller.availablePermissions = [.allowReadOnly, .allowPrivate]
-        controller.delegate = context.coordinator
-        return controller
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        vc.completionWithItemsHandler = { _, _, _, _ in dismiss() }
+        return vc
     }
 
-    func updateUIViewController(_ uiViewController: UICloudSharingController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSaveError: onSaveError)
-    }
-
-    final class Coordinator: NSObject, UICloudSharingControllerDelegate {
-        private let onSaveError: (String) -> Void
-
-        init(onSaveError: @escaping (String) -> Void) {
-            self.onSaveError = onSaveError
-        }
-
-        func itemTitle(for csc: UICloudSharingController) -> String? {
-            "My Sleep Score"
-        }
-
-        func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: any Error) {
-            onSaveError(error.localizedDescription)
-        }
-    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

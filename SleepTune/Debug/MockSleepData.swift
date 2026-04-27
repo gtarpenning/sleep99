@@ -90,14 +90,17 @@ enum MockSleepData {
     static let rrSeries: SleepChartSeries = {
         let rawValues: [(Double, Double)] = [
             (18,15),(30,14),(50,13),(70,13),(90,12),(110,13),(130,14),
-            (150,15),(165,13),(185,12),(205,12),(225,13),(245,14),
+            (150,15),(165,13),(185,12),(205,12),
+            // Apnea event ~t=215–232: brief cessation followed by gasping recovery spike
+            (215,10),(220,19),(225,23),(232,18),
+            (245,14),
             (265,15),(285,14),(305,13),(325,14),(345,15),(365,16),
             (383,14),(400,13),(415,14),(435,15)
         ]
         let points = rawValues.map { SleepChartPoint(date: t($0.0), value: $0.1) }
         return SleepChartSeries(title: "Respiratory Rate", unit: "br/min", points: points)
     }()
-    // Avg ≈ 13.6 br/min
+    // Avg ≈ 14 br/min; apnea spike peaks at ~23 br/min around t=225 (deep sleep period)
 
     // MARK: - SleepSignalSamples (for HealthKitClient mock)
 
@@ -272,6 +275,102 @@ enum MockSleepData {
         "Blood Oxygen":         .init(avg: 97.2, min: 95.5, max: 99.0, count: 25),
     ]
 
+    // MARK: - Activity snapshot (yesterday's activity day)
+
+    static let activitySnapshot: DailyActivitySnapshot = {
+        let now = Date()
+        let dayStart = Calendar.current.startOfDay(for: now).addingTimeInterval(-86400)
+        return DailyActivitySnapshot(
+            date: dayStart,
+            steps: 8_420,
+            activeCalories: 538,
+            exerciseMinutes: 52,
+            standMinutes: 490,
+            floorsClimbed: 14,
+            peakHR: 158,
+            vo2Max: 48.2,
+            workouts: [
+                WorkoutSummary(
+                    id: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
+                    activityName: "Running",
+                    durationMinutes: 34,
+                    activeCalories: 385,
+                    startDate: dayStart.addingTimeInterval(7 * 3600),
+                    endDate:   dayStart.addingTimeInterval(7 * 3600 + 34 * 60)
+                ),
+                WorkoutSummary(
+                    id: UUID(uuidString: "11111111-0000-0000-0000-000000000002")!,
+                    activityName: "Yoga",
+                    durationMinutes: 22,
+                    activeCalories: 92,
+                    startDate: dayStart.addingTimeInterval(18 * 3600),
+                    endDate:   dayStart.addingTimeInterval(18 * 3600 + 22 * 60)
+                ),
+            ]
+        )
+    }()
+
+    // MARK: - Tag correlations (mock — simulates 60 nights of history)
+
+    static let tagCorrelations: [TagCorrelation] = {
+        let alcoholTag = SleepTag(id: UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000001")!, name: "alcohol")
+        let stressTag  = SleepTag(id: UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000002")!, name: "stressed")
+        let gymTag     = SleepTag(id: UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000003")!, name: "exercised")
+
+        let alcoholCorrelation = TagCorrelation(
+            tag: alcoholTag,
+            taggedNights: 6,
+            avgScoreTagged: 54,
+            avgScoreBaseline: 78,
+            metricImpacts: [
+                MetricImpact(metricName: "HRV",              unit: "ms",     taggedAvg: 33,   baselineAvg: 50,   lowerIsBetter: false),
+                MetricImpact(metricName: "Overnight Heart Rate", unit: "bpm", taggedAvg: 63,  baselineAvg: 54,   lowerIsBetter: true),
+                MetricImpact(metricName: "REM Sleep",        unit: "min",    taggedAvg: 68,   baselineAvg: 108,  lowerIsBetter: false),
+                MetricImpact(metricName: "Sleep Efficiency", unit: "%",      taggedAvg: 79,   baselineAvg: 88,   lowerIsBetter: false),
+                MetricImpact(metricName: "Respiratory Rate", unit: "br/min", taggedAvg: 15.8, baselineAvg: 13.8, lowerIsBetter: true),
+            ]
+        )
+
+        let stressCorrelation = TagCorrelation(
+            tag: stressTag,
+            taggedNights: 9,
+            avgScoreTagged: 64,
+            avgScoreBaseline: 78,
+            metricImpacts: [
+                MetricImpact(metricName: "Sleep Latency",    unit: "min",    taggedAvg: 34,   baselineAvg: 15,   lowerIsBetter: true),
+                MetricImpact(metricName: "Deep Sleep",       unit: "min",    taggedAvg: 51,   baselineAvg: 78,   lowerIsBetter: false),
+                MetricImpact(metricName: "HRV",              unit: "ms",     taggedAvg: 41,   baselineAvg: 50,   lowerIsBetter: false),
+                MetricImpact(metricName: "Long Awakenings",  unit: "x",      taggedAvg: 1.6,  baselineAvg: 0.4,  lowerIsBetter: true),
+            ]
+        )
+
+        let gymCorrelation = TagCorrelation(
+            tag: gymTag,
+            taggedNights: 14,
+            avgScoreTagged: 84,
+            avgScoreBaseline: 78,
+            metricImpacts: [
+                MetricImpact(metricName: "Deep Sleep",       unit: "min",    taggedAvg: 98,   baselineAvg: 78,   lowerIsBetter: false),
+                MetricImpact(metricName: "HRV",              unit: "ms",     taggedAvg: 57,   baselineAvg: 50,   lowerIsBetter: false),
+                MetricImpact(metricName: "Lowest Overnight HR", unit: "bpm", taggedAvg: 41,   baselineAvg: 46,   lowerIsBetter: true),
+            ]
+        )
+
+        return [alcoholCorrelation, stressCorrelation, gymCorrelation]
+    }()
+
+    // MARK: - Activity monthly stats (30-day ranges for each activity metric)
+
+    static let activityMonthlyStats: [String: MetricStats] = [
+        "steps":  .init(avg: 7_650, min: 2_800, max: 14_200, count: 28),
+        "kcal":   .init(avg: 485,   min: 180,   max: 820,    count: 28),
+        "ex":     .init(avg: 36,    min: 0,     max: 92,     count: 28),
+        "peakhr": .init(avg: 155,   min: 118,   max: 196,    count: 26),
+        "floors": .init(avg: 9,     min: 2,     max: 22,     count: 28),
+        "stand":  .init(avg: 440,   min: 210,   max: 660,    count: 27),
+        "vo2":    .init(avg: 47.4,  min: 43.0,  max: 52.1,   count: 12),
+    ]
+
     // MARK: - Summary
 
     static let summary = SleepScoreSummary(
@@ -284,16 +383,21 @@ enum MockSleepData {
         primarySource: .appleWatch
     )
 
-    // MARK: - Score history (last 7 days)
+    // MARK: - Score history (last 30 days)
 
     static let scoreHistory: [SleepScoreTrendPoint] = {
-        // (overall, sleep, recovery)
+        // Realistic 30-day arc: rough patch → gradual improvement → current
         let scores: [(Double, Double, Double)] = [
+            (58, 55, 61), (61, 58, 63), (54, 51, 57), (67, 64, 70), (63, 60, 65),
+            (70, 67, 72), (72, 69, 74), (65, 63, 68), (68, 65, 70), (74, 71, 76),
+            (71, 68, 73), (76, 73, 78), (69, 67, 72), (73, 70, 75), (78, 76, 80),
+            (75, 72, 77), (80, 77, 82), (72, 70, 74), (77, 74, 79), (74, 72, 77),
             (62, 58, 65), (71, 68, 73), (68, 70, 66),
-            (75, 72, 77), (73, 76, 71), (79, 77, 81), (78, 76, 81)
+            (75, 72, 77), (73, 76, 71), (79, 77, 81),
+            (76, 74, 78), (81, 79, 83), (80, 78, 82), (78, 76, 81),
         ]
         return scores.enumerated().map { i, trio in
-            let date = Calendar.current.date(byAdding: .day, value: -(6 - i), to: Date().startOfDay)!
+            let date = Calendar.current.date(byAdding: .day, value: -(29 - i), to: Date().startOfDay)!
             return SleepScoreTrendPoint(date: date, score: trio.0, sleepScore: trio.1, recoveryScore: trio.2)
         }
     }()

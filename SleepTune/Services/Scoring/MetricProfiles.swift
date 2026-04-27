@@ -30,17 +30,40 @@ struct MetricTargetGuidance: Sendable, Equatable {
 
 // MARK: - Effective baseline
 
-/// Returns the baseline value used as the "perfect" reference for a metric,
-/// applying percentile overrides for HR/HRV/RR so the bar is set to best nights,
-/// not the average. Used by both the score engine and breakdown display.
+/// Returns the baseline value used as the "perfect" reference for a metric.
+/// All metrics use an aspirational percentile target (p75 for higher-is-better,
+/// p25 for lower-is-better) so the bar is set to good nights, not average nights.
+/// Special cases: Duration has an 8h hard floor; HR/HRV/RR use tighter percentiles;
+/// Bedtime Consistency and Wrist Temperature use avg as their deviation reference.
+/// Used by both the score engine and breakdown display — single source of truth.
 func effectiveBaseline(name: String, stats: MetricStats?) -> Double? {
     guard let stats else { return nil }
     switch name {
-    case "Lowest Overnight HR":   return stats.min
-    case "HRV":                   return stats.percentile(0.75)
-    case "Overnight Heart Rate",
-         "Respiratory Rate":      return stats.percentile(0.10)
-    default:                      return stats.avg
+    case "Sleep Duration":               return max(stats.percentile(0.75), 8.0)
+    case "Lowest Overnight HR":          return stats.min
+    case "HRV", "Peak HRV",
+         "REM Cycle Count":             return stats.percentile(0.75)
+    case "Overnight Heart Rate":        return stats.percentile(0.25)
+    case "Respiratory Rate":            return stats.percentile(0.10)
+    // Deviation-based metrics: avg is the reference point, not an aspirational target
+    case "Bedtime Consistency",
+         "Wrist Temperature":           return stats.avg
+    default:
+        guard let def = MetricRegistry.definition(for: name) else { return stats.avg }
+        return def.lowerIsBetter ? stats.percentile(0.25) : stats.percentile(0.75)
+    }
+}
+
+/// Minimum delta considered meaningful given a unit's display precision.
+/// Any delta smaller than this would display as "0" and should score/display identically.
+func displayPrecisionThreshold(for unit: String, metricName: String? = nil) -> Double {
+    switch unit {
+    case "bpm", "ms", "min", "x", "cycles", "events": return 1.0
+    case "hr":      return 1.0 / 60.0   // 1 minute in hours
+    case "%":       return metricName == "Blood Oxygen" ? 0.1 : 1.0
+    case "br/min":  return 0.1
+    case "fraction": return 0.005
+    default:        return 1.0
     }
 }
 
@@ -60,7 +83,22 @@ func metricTargetGuidance(name: String, stats: MetricStats?) -> MetricTargetGuid
             value: stats.percentile(0.75),
             label: "Target set by your top quartile nights over the last 30."
         )
-    case "Overnight Heart Rate", "Respiratory Rate":
+    case "Peak HRV":
+        return MetricTargetGuidance(
+            value: stats.percentile(0.75),
+            label: "Target set by your top quartile peak readings over the last 30."
+        )
+    case "REM Cycle Count":
+        return MetricTargetGuidance(
+            value: stats.percentile(0.75),
+            label: "Target set by your top quartile nights over the last 30."
+        )
+    case "Overnight Heart Rate":
+        return MetricTargetGuidance(
+            value: stats.percentile(0.25),
+            label: "Target set by your best 25% of nights over the last 30."
+        )
+    case "Respiratory Rate":
         return MetricTargetGuidance(
             value: stats.percentile(0.10),
             label: "Target set by your best 10% of nights over the last 30."
@@ -106,9 +144,11 @@ func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
     if let avg = monthlyAvg {
         switch name {
         case "Sleep Duration":
-            // At or above baseline → 100%. -33% per hour below avg. 3h short → 0%.
-            if value >= avg { return 1 }
-            return max(0, 1 - (avg - value) / 3.0)
+            // 8h is the hard floor for perfect. Personal avg raises the target further if > 8h.
+            // -33% per hour below target. 3h short → 0%.
+            let target = max(avg, 8.0)
+            if value >= target - 1.0/60.0 { return 1 }   // 1-min display tolerance
+            return max(0, 1 - (target - value) / 3.0)
 
         case "Bedtime Consistency":
             // One-sided: going to bed EARLIER than usual is never penalized.
@@ -118,23 +158,37 @@ func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
             if delta <= deadband { return 1 }
             return max(0, 1 - (delta - deadband) / 1.0)
 
-        case "HRV":
-            // avg is p75 of the month (passed in via monthlyAverages override).
-            // At or above p75 → perfect. 20 ms below p75 → ~0%.
-            if value >= avg { return 1 }
-            return max(0, 1 - (avg - value) / 20)
+        case "HRV", "Peak HRV":
+            // avg is p75. At or above → perfect.
+            // Decay is relative to baseline: 30% below p75 → 0%.
+            // e.g. p75=50ms → floor at 35ms; p75=100ms → floor at 70ms.
+            if value >= avg - 1.0 { return 1 }   // 1-ms display tolerance
+            return max(0, 1 - (avg - value) / (avg * 0.30))
 
-        case "Overnight Heart Rate", "Lowest Overnight HR":
-            // avg is p10 (best 10%) for Overnight HR; min for Lowest.
-            // At or below → perfect. -10% per bpm above target.
-            if value <= avg { return 1 }
+        case "REM Cycle Count":
+            // avg is p75 (top-quartile nights). At or above → perfect.
+            // -20% per cycle below target: p75-1 = 80%, p75-2 = 60%, p75-5 = 0%.
+            if value >= avg - 0.5 { return 1 }
+            return max(0, 1 - (avg - value) * 0.20)
+
+        case "Overnight Heart Rate":
+            // avg is p25 (best 25% of nights = lowest HR quartile). At or below → perfect.
+            // -10% per bpm above p25: +7 bpm → ~30% (≈ 5/15 pts).
+            if value <= avg + 1.0 { return 1 }   // 1-bpm display tolerance
             return max(0, 1 - (value - avg) * 0.10)
+
+        case "Lowest Overnight HR":
+            // avg is the monthly minimum — a night-floor reference.
+            // Gentle slope since matching your absolute best night is rare.
+            if value <= avg + 1.0 { return 1 }   // 1-bpm display tolerance
+            return max(0, 1 - (value - avg) * 0.05)
 
         case "Respiratory Rate":
             // avg is p10 (best 10% / lowest readings) for respiratory rate.
-            // At or below → perfect. Very sensitive: +0.2 br/min = -30%.
-            if value <= avg { return 1 }
-            return max(0, 1 - (value - avg) * 1.5)
+            // At or below → perfect. +1 br/min above p10 → 0,
+            // so being at your mean (~0.5–1.5 above p10) still scores ~50–75%.
+            if value <= avg + 0.1 { return 1 }   // 0.1 br/min display tolerance
+            return max(0, 1 - (value - avg) * 1.0)
 
         default:
             break

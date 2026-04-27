@@ -21,6 +21,12 @@ final class AuthService {
         UserDefaults.standard.set(emoji, forKey: "auth.avatarEmoji")
     }
 
+    func updateDisplayName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        displayName = trimmed.isEmpty ? nil : trimmed
+        UserDefaults.standard.set(displayName, forKey: "auth.displayName")
+    }
+
     // MARK: - Session restore (call on launch)
 
     func restoreSession() async {

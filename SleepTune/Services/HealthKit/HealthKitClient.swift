@@ -245,6 +245,60 @@ class HealthKitClient {
             SleepChartSeries(title: "HRV", unit: "ms", points: hrvPoints)
         ]
     }
+
+    func fetchActivitySnapshot(for date: Date) async -> DailyActivitySnapshot {
+        let interval = dayInterval(for: date)
+        let predicate = HKQuery.predicateForSamples(
+            withStart: interval.start,
+            end: interval.end,
+            options: [.strictStartDate, .strictEndDate]
+        )
+
+        async let steps         = fetchSum(for: .stepCount,           predicate: predicate, unit: .count())
+        async let activeCal     = fetchSum(for: .activeEnergyBurned,  predicate: predicate, unit: .kilocalorie())
+        async let exerciseMins  = fetchSum(for: .appleExerciseTime,   predicate: predicate, unit: .minute())
+        async let standMins     = fetchSum(for: .appleStandTime,      predicate: predicate, unit: .minute())
+        async let floors        = fetchSum(for: .flightsClimbed,      predicate: predicate, unit: .count())
+        async let peakHR        = fetchMax(for: .heartRate,           predicate: predicate, unit: .count().unitDivided(by: .minute()))
+
+        // VO2 Max changes slowly — fetch the most recent sample on or before end of this day
+        let vo2MaxPredicate = HKQuery.predicateForSamples(
+            withStart: interval.start.addingTimeInterval(-90 * 24 * 3600),
+            end: interval.end,
+            options: [.strictEndDate]
+        )
+        async let vo2Max = fetchMax(for: .vo2Max, predicate: vo2MaxPredicate, unit: HKUnit(from: "ml/kg·min"))
+
+        let rawWorkouts: [HKWorkout] = (try? await fetchSamples(
+            type: HKObjectType.workoutType(),
+            predicate: predicate,
+            limit: HKObjectQueryNoLimit,
+            sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+        )) ?? []
+
+        let workouts = rawWorkouts.map { w in
+            WorkoutSummary(
+                id: w.uuid,
+                activityName: w.workoutActivityType.displayName,
+                durationMinutes: w.duration / 60,
+                activeCalories: w.totalEnergyBurned?.doubleValue(for: .kilocalorie()),
+                startDate: w.startDate,
+                endDate: w.endDate
+            )
+        }
+
+        return DailyActivitySnapshot(
+            date: date,
+            steps: await steps,
+            activeCalories: await activeCal,
+            exerciseMinutes: await exerciseMins,
+            standMinutes: await standMins,
+            floorsClimbed: await floors,
+            peakHR: await peakHR,
+            vo2Max: await vo2Max,
+            workouts: workouts
+        )
+    }
 }
 
 private extension HealthKitClient {
@@ -522,6 +576,21 @@ private extension HealthKitClient {
             range: 0...3
         ))
 
+        // REM cycles: merged distinct REM episodes > 5 min.
+        // Only calculated when there are actual REM samples (not just unspecified asleep).
+        let remCycleCount = countRemCycles(from: samples)
+        if remCycleCount > 0 {
+            indicators.append(SleepIndicator(
+                name: "REM Cycle Count",
+                detail: "Distinct REM episodes (≥5 min each)",
+                value: Double(remCycleCount),
+                unit: "cycles",
+                category: .sleepArchitecture,
+                source: .appleHealth,
+                range: 1...8
+            ))
+        }
+
         return indicators
     }
 
@@ -534,6 +603,35 @@ private extension HealthKitClient {
     /// Computes the union of time intervals for samples matching the given filter.
     /// Prevents double-counting when multiple sources (e.g. Oura, Apple Watch) write
     /// overlapping records for the same time period.
+    /// Counts distinct REM episodes after merging overlapping samples.
+    /// Only episodes longer than `minDuration` are counted (default 5 min).
+    func countRemCycles(from samples: [HKCategorySample], minDuration: TimeInterval = 5 * 60) -> Int {
+        let intervals = samples
+            .compactMap { s -> (Date, Date)? in
+                HKCategoryValueSleepAnalysis(rawValue: s.value) == .asleepREM
+                    ? (s.startDate, s.endDate) : nil
+            }
+            .sorted { $0.0 < $1.0 }
+
+        guard !intervals.isEmpty else { return 0 }
+
+        var count = 0
+        var start = intervals[0].0
+        var end   = intervals[0].1
+
+        for (s, e) in intervals.dropFirst() {
+            if s <= end {
+                end = max(end, e)
+            } else {
+                if end.timeIntervalSince(start) >= minDuration { count += 1 }
+                start = s
+                end   = e
+            }
+        }
+        if end.timeIntervalSince(start) >= minDuration { count += 1 }
+        return count
+    }
+
     func unionSleepSeconds(
         from samples: [HKCategorySample],
         filter: (HKCategoryValueSleepAnalysis) -> Bool
@@ -582,8 +680,9 @@ private extension HealthKitClient {
 
         async let lowestHRStats = fetchMin(for: .heartRate, predicate: hrPredicate, unit: hrUnit)
         async let avgHRStats    = fetchAverage(for: .heartRate, predicate: hrPredicate, unit: hrUnit)
-        async let hrv       = fetchAverage(for: .heartRateVariabilitySDNN, predicate: predicate, unit: .secondUnit(with: .milli))
-        async let respiratory = fetchAverage(for: .respiratoryRate, predicate: predicate, unit: hrUnit)
+        async let hrv       = fetchAverage(for: .heartRateVariabilitySDNN, predicate: hrPredicate, unit: .secondUnit(with: .milli))
+        async let peakHRV   = fetchMax(for: .heartRateVariabilitySDNN, predicate: hrPredicate, unit: .secondUnit(with: .milli))
+        async let respiratory = fetchAverage(for: .respiratoryRate, predicate: hrPredicate, unit: hrUnit)
         async let oxygen    = fetchAverage(for: .oxygenSaturation, predicate: predicate, unit: .percent())
         async let wristTemp = fetchAverage(for: .appleSleepingWristTemperature, predicate: predicate, unit: .degreeCelsius())
 
@@ -642,12 +741,24 @@ private extension HealthKitClient {
         if let value = await hrv {
             indicators.append(SleepIndicator(
                 name: "HRV",
-                detail: "Recovery signal",
+                detail: "Average overnight HRV",
                 value: value,
                 unit: "ms",
                 category: .recovery,
                 source: .appleWatch,
                 range: 20...90
+            ))
+        }
+
+        if let value = await peakHRV {
+            indicators.append(SleepIndicator(
+                name: "Peak HRV",
+                detail: "Highest HRV reading overnight",
+                value: value,
+                unit: "ms",
+                category: .recovery,
+                source: .appleWatch,
+                range: 30...120
             ))
         }
 
@@ -660,6 +771,50 @@ private extension HealthKitClient {
                 category: .recovery,
                 source: .appleWatch,
                 range: 10...20
+            ))
+        }
+
+        // Apnea Events — count RR spikes ≥ 25% above nightly mean, grouped within 5 min.
+        // Uses the tight sleep-window predicate so daytime readings don't skew the mean.
+        // Apple Watch's RR is a smoothed signal (~1-min averages), so 1.5× is unreachable;
+        // 1.25× (e.g. 19 br/min on a 15 mean) catches genuine arousal/disturbance events.
+        // Emitted as sleepArchitecture so it surfaces in the Sleep section of the breakdown.
+        let apneaEvents: Int? = await {
+            guard let type = HKObjectType.quantityType(forIdentifier: .respiratoryRate) else { return nil }
+            let rrUnit = HKUnit.count().unitDivided(by: .minute())
+            let rrSamples: [HKQuantitySample] = (try? await fetchSamples(
+                type: type,
+                predicate: hrPredicate,
+                limit: HKObjectQueryNoLimit,
+                sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            )) ?? []
+            guard rrSamples.count >= 10 else { return nil }
+            let values = rrSamples.map { $0.quantity.doubleValue(for: rrUnit) }
+            let mean = values.reduce(0, +) / Double(values.count)
+            let spikeThreshold = mean * 1.25
+            var count = 0
+            var lastSpikeEnd: Date? = nil
+            for sample in rrSamples {
+                guard sample.quantity.doubleValue(for: rrUnit) >= spikeThreshold else { continue }
+                if let last = lastSpikeEnd, sample.startDate.timeIntervalSince(last) < 5 * 60 {
+                    lastSpikeEnd = max(last, sample.endDate)
+                } else {
+                    count += 1
+                    lastSpikeEnd = sample.endDate
+                }
+            }
+            return count > 0 ? count : nil
+        }()
+
+        if let events = apneaEvents {
+            indicators.append(SleepIndicator(
+                name: "Apnea Events",
+                detail: "RR spikes ≥50% above nightly mean",
+                value: Double(events),
+                unit: "events",
+                category: .sleepArchitecture,
+                source: .appleWatch,
+                range: 0...10
             ))
         }
 
@@ -844,6 +999,18 @@ private extension HealthKitClient {
         return quantity.doubleValue(for: unit)
     }
 
+    func fetchMax(
+        for identifier: HKQuantityTypeIdentifier,
+        predicate: NSPredicate,
+        unit: HKUnit
+    ) async -> Double? {
+        let type = HKObjectType.quantityType(forIdentifier: identifier)
+        guard let stats = try? await fetchStatistics(type: type, predicate: predicate, options: .discreteMax),
+              let quantity = stats.maximumQuantity()
+        else { return nil }
+        return quantity.doubleValue(for: unit)
+    }
+
     func fetchAverage(
         for identifier: HKQuantityTypeIdentifier,
         predicate: NSPredicate,
@@ -869,3 +1036,56 @@ private extension HealthKitClient {
     }
 }
 extension NSPredicate: @unchecked Sendable {}
+
+extension HKWorkoutActivityType {
+    var displayName: String {
+        switch self {
+        case .running:                          return "Running"
+        case .cycling:                          return "Cycling"
+        case .walking:                          return "Walking"
+        case .swimming:                         return "Swimming"
+        case .yoga:                             return "Yoga"
+        case .functionalStrengthTraining:       return "Strength Training"
+        case .traditionalStrengthTraining:      return "Strength Training"
+        case .highIntensityIntervalTraining:    return "HIIT"
+        case .tennis:                           return "Tennis"
+        case .soccer:                           return "Soccer"
+        case .basketball:                       return "Basketball"
+        case .dance:                            return "Dance"
+        case .pilates:                          return "Pilates"
+        case .rowing:                           return "Rowing"
+        case .elliptical:                       return "Elliptical"
+        case .stairClimbing:                    return "Stair Climbing"
+        case .hiking:                           return "Hiking"
+        case .crossCountrySkiing:               return "Cross-Country Skiing"
+        case .downhillSkiing:                   return "Skiing"
+        case .snowboarding:                     return "Snowboarding"
+        case .surfingSports:                    return "Surfing"
+        case .golf:                             return "Golf"
+        case .baseball:                         return "Baseball"
+        case .softball:                         return "Softball"
+        case .volleyball:                       return "Volleyball"
+        case .badminton:                        return "Badminton"
+        case .racquetball:                      return "Racquetball"
+        case .squash:                           return "Squash"
+        case .tableTennis:                      return "Table Tennis"
+        case .barre:                            return "Barre"
+        case .boxing:                           return "Boxing"
+        case .kickboxing:                       return "Kickboxing"
+        case .martialArts:                      return "Martial Arts"
+        case .wrestling:                        return "Wrestling"
+        case .climbing:                         return "Climbing"
+        case .gymnastics:                       return "Gymnastics"
+        case .jumpRope:                         return "Jump Rope"
+        case .skatingSports:                    return "Skating"
+        case .mindAndBody:                      return "Mind & Body"
+        case .preparationAndRecovery:           return "Recovery"
+        case .flexibility:                      return "Flexibility"
+        case .cooldown:                         return "Cooldown"
+        case .waterSports:                      return "Water Sports"
+        case .handCycling:                      return "Hand Cycling"
+        case .other:                            return "Workout"
+        default:                                return "Workout"
+        }
+    }
+}

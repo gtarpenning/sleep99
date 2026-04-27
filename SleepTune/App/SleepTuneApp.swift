@@ -5,9 +5,10 @@ struct SleepTuneApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     #if DEBUG
-    @State private var container: AppContainer = ProcessInfo.processInfo.arguments.contains("-mockData")
-        ? .mock()
-        : AppContainer()
+    // Debug builds use mock data by default. Add "-realData" as a launch argument to test real HealthKit.
+    @State private var container: AppContainer = ProcessInfo.processInfo.arguments.contains("-realData")
+        ? AppContainer()
+        : .mock()
     #else
     @State private var container = AppContainer()
     #endif
@@ -18,7 +19,7 @@ struct SleepTuneApp: App {
                 .environment(container)
                 .task {
                     #if DEBUG
-                    if !ProcessInfo.processInfo.arguments.contains("-mockData") {
+                    if ProcessInfo.processInfo.arguments.contains("-realData") {
                         await container.authService.restoreSession()
                     }
                     #else

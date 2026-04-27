@@ -44,6 +44,14 @@ enum MetricRegistry {
               weight: 0.05, lowerIsBetter: true,
               hint: "0 = perfect · each long waking hurts"),
 
+        // Proxy for sleep-disordered breathing. Score is absolute (0 always perfect)
+        // so we don't use personal monthly average as the target here.
+        .init(name: "Apnea Events",
+              category: .sleepArchitecture,
+              scoring: .lowerIsBetter(idealMax: 0, hardMax: 5),    // 0 = perfect, 5+ = 0
+              weight: 0.08, lowerIsBetter: true,
+              hint: "0 = perfect · fewer events is better"),
+
         // Average HR during sleep scores in BOTH categories (see recovery entry below).
         // Physiologically it reflects sleep quality (arousal, stress) AND cardiovascular recovery.
         .init(name: "Overnight Heart Rate",
@@ -55,6 +63,12 @@ enum MetricRegistry {
               category: .sleepArchitecture,
               scoring: .higherIsBetter(hardMin: 30, idealMin: 90), // minutes; personal avg beats 90
               weight: 0.20, lowerIsBetter: false, hint: nil),
+
+        .init(name: "REM Cycle Count",
+              category: .sleepArchitecture,
+              scoring: .higherIsBetter(hardMin: 1, idealMin: 5),   // count; personal p75 is perfect
+              weight: 0.05, lowerIsBetter: false,
+              hint: "target = your top-quartile cycle count (30d)"),
 
         .init(name: "Deep Sleep",
               category: .sleepArchitecture,
@@ -103,8 +117,13 @@ enum MetricRegistry {
 
         .init(name: "HRV",
               category: .recovery,
-              scoring: .higherIsBetter(hardMin: 10, idealMin: 50), // ms SDNN; personal avg beats 50
-              weight: 0.30, lowerIsBetter: false, hint: nil),
+              scoring: .higherIsBetter(hardMin: 10, idealMin: 50), // ms SDNN; personal p75 beats 50
+              weight: 0.15, lowerIsBetter: false, hint: nil),
+
+        .init(name: "Peak HRV",
+              category: .recovery,
+              scoring: .higherIsBetter(hardMin: 15, idealMin: 70), // ms SDNN; best single reading of the night
+              weight: 0.15, lowerIsBetter: false, hint: nil),
 
         .init(name: "Respiratory Rate",
               category: .recovery,

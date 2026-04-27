@@ -14,19 +14,19 @@ final class DashboardViewModel {
     var lastNightHeartRateSeries: SleepChartSeries?
     var lastNightHRVSeries: SleepChartSeries?
     var lastNightRespiratoryRateSeries: SleepChartSeries?
+    var activitySnapshot: DailyActivitySnapshot?
+    var tagCorrelations: [TagCorrelation]
     var scoreHistory: [SleepScoreTrendPoint]
     var trendRange: SleepScoreTrendRange
     var monthlyStats: [String: MetricStats] = [:]
+    var activityMonthlyStats: [String: MetricStats] = [:]
 
-    /// Effective baselines for scoreMetric() — percentile-based for HR/HRV/RR,
-    /// monthly min for Lowest Overnight HR, avg for everything else.
+    /// Effective baselines for scoreMetric() — delegates to effectiveBaseline() which is
+    /// the single source of truth for aspirational percentile targets across all metrics.
     var monthlyAverages: [String: Double] {
-        var result = monthlyStats.mapValues(\.avg)
-        if let s = monthlyStats["Lowest Overnight HR"]   { result["Lowest Overnight HR"]   = s.min }
-        if let s = monthlyStats["HRV"]                   { result["HRV"]                   = s.percentile(0.75) }
-        if let s = monthlyStats["Overnight Heart Rate"]  { result["Overnight Heart Rate"]  = s.percentile(0.10) }
-        if let s = monthlyStats["Respiratory Rate"]      { result["Respiratory Rate"]       = s.percentile(0.10) }
-        return result
+        monthlyStats.reduce(into: [:]) { result, pair in
+            result[pair.key] = effectiveBaseline(name: pair.key, stats: pair.value)
+        }
     }
 
     /// Sleep window for the selected night, derived from stage data.
@@ -42,6 +42,8 @@ final class DashboardViewModel {
     private let localStore: SleepLocalStore
     private let authService: AuthService
     private let cloudKitService: CloudKitService
+    private let tagInsightEngine = TagInsightEngine()
+    var tagStore: SleepTagStore?
 
     init(
         healthKitClient: HealthKitClient,
@@ -73,6 +75,8 @@ final class DashboardViewModel {
         self.lastNightHeartRateSeries = nil
         self.lastNightHRVSeries = nil
         self.lastNightRespiratoryRateSeries = nil
+        self.activitySnapshot = nil
+        self.tagCorrelations = []
         self.scoreHistory = []
         self.trendRange = .week
 
@@ -98,6 +102,7 @@ final class DashboardViewModel {
             await loadTrendHistory()
             await refreshLastNightData()
             await loadMonthlyStats()
+            await loadActivityMonthlyStats()
 
             // If live stages show the cached duration is significantly off, refetch and show
             // only that single corrected score. Otherwise score once from cache.
@@ -110,6 +115,7 @@ final class DashboardViewModel {
         } else {
             // No cache — fetch from HealthKit (also handles monthly stats + score inside).
             await refreshFromHealthKit()
+            await loadActivityMonthlyStats()
         }
     }
 
@@ -177,6 +183,7 @@ final class DashboardViewModel {
             )
             await loadTrendHistory()
             await publishToCloudKit(capturedSummary)
+            await refreshTagInsights()
         }
     }
 
@@ -197,20 +204,25 @@ final class DashboardViewModel {
         for offset in 1..<30 {
             guard let day = Calendar.current.date(byAdding: .day, value: -offset, to: today) else { continue }
             let cached = await localStore.loadIndicators(for: day)
-            guard cached.isEmpty else { continue }
-            if let fetched = try? await healthKitClient.fetchSleepIndicators(for: day), !fetched.isEmpty {
-                await localStore.saveIndicators(fetched, for: day)
-                // Persist score for trend chart
-                let daySummary = scoreEngine.score(indicators: fetched, weights: .default)
-                await localStore.saveScore(
-                    daySummary.score,
-                    sleepScore: daySummary.sleepScore,
-                    recoveryScore: daySummary.recoveryScore,
-                    for: day
-                )
+            if cached.isEmpty {
+                if let fetched = try? await healthKitClient.fetchSleepIndicators(for: day), !fetched.isEmpty {
+                    await localStore.saveIndicators(fetched, for: day)
+                    let daySummary = scoreEngine.score(indicators: fetched, weights: .default)
+                    await localStore.saveScore(
+                        daySummary.score,
+                        sleepScore: daySummary.sleepScore,
+                        recoveryScore: daySummary.recoveryScore,
+                        for: day
+                    )
+                }
+            }
+            if await localStore.loadActivitySnapshot(for: day) == nil {
+                let snap = await healthKitClient.fetchActivitySnapshot(for: day)
+                await localStore.saveActivitySnapshot(snap, for: day)
             }
         }
         await loadTrendHistory()
+        await loadActivityMonthlyStats()
     }
 
     private func publishToCloudKit(_ summary: SleepScoreSummary) async {
@@ -223,6 +235,8 @@ final class DashboardViewModel {
         let totalMinutes = indicators
             .first(where: { $0.name == "Sleep Duration" })
             .map { Int($0.value * 60) } ?? 0
+        let avgHR  = indicators.first(where: { $0.name == "Overnight Heart Rate" }).map { Int($0.value.rounded()) }
+        let avgHRV = indicators.first(where: { $0.name == "HRV" }).map { Int($0.value.rounded()) }
         do {
             try await cloudKitService.publishTodayScore(
                 summary,
@@ -230,7 +244,9 @@ final class DashboardViewModel {
                 userID: userID,
                 displayName: displayName,
                 avatarColor: "#5E5CE6",
-                avatarEmoji: authService.avatarEmoji
+                avatarEmoji: authService.avatarEmoji,
+                avgHR: avgHR,
+                avgHRV: avgHRV
             )
         } catch {}
     }
@@ -245,9 +261,11 @@ final class DashboardViewModel {
         }
 
         do {
-            async let stagesTask = healthKitClient.fetchSleepStages(for: selectedDate)
-            async let signalsTask = healthKitClient.fetchSignals(for: selectedDate)
-            let (stages, signals) = try await (stagesTask, signalsTask)
+            let activityDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+            async let stagesTask    = healthKitClient.fetchSleepStages(for: selectedDate)
+            async let signalsTask   = healthKitClient.fetchSignals(for: selectedDate)
+            async let activityTask  = healthKitClient.fetchActivitySnapshot(for: activityDate)
+            let (stages, signals, activity) = try await (stagesTask, signalsTask, activityTask)
 
             // Find the PRIMARY sleep block — the longest contiguous run of asleep stages.
             // Using min/max of all asleep records breaks when third-party apps write wide
@@ -264,6 +282,8 @@ final class DashboardViewModel {
                 lastNightHRVSeries             = makeSignalSeries(from: signals, type: .heartRateVariability)
                 lastNightRespiratoryRateSeries = makeSignalSeries(from: signals, type: .respiratoryRate)
             }
+            activitySnapshot = activity
+            await localStore.saveActivitySnapshot(activity, for: activityDate)
         } catch {
             lastNightStages = []
             lastNightHeartRateSeries = nil
@@ -347,6 +367,8 @@ final class DashboardViewModel {
         lastNightHeartRateSeries = nil
         lastNightHRVSeries = nil
         lastNightRespiratoryRateSeries = nil
+        activitySnapshot = nil
+        tagCorrelations = []
         scoreHistory = []
     }
 
@@ -377,6 +399,44 @@ final class DashboardViewModel {
                 sortedValues: t.values.sorted()
             )
         }
+    }
+
+    private func loadActivityMonthlyStats() async {
+        let cal = Calendar.current
+        let today = Date()
+        var totals: [String: (sum: Double, min: Double, max: Double, count: Int, values: [Double])] = [:]
+
+        func collect(_ v: Double?, key: String) {
+            guard let v, v > 0 else { return }
+            var e = totals[key] ?? (0, .infinity, -.infinity, 0, [])
+            e.sum += v; e.min = Swift.min(e.min, v); e.max = Swift.max(e.max, v)
+            e.count += 1; e.values.append(v)
+            totals[key] = e
+        }
+
+        for offset in 1...30 {
+            guard let day = cal.date(byAdding: .day, value: -offset, to: today),
+                  let snap = await localStore.loadActivitySnapshot(for: day) else { continue }
+            collect(snap.steps,          key: "steps")
+            collect(snap.activeCalories, key: "kcal")
+            collect(snap.exerciseMinutes,key: "ex")
+            collect(snap.peakHR,         key: "peakhr")
+            collect(snap.floorsClimbed,  key: "floors")
+            collect(snap.standMinutes,   key: "stand")
+            collect(snap.vo2Max,         key: "vo2")
+        }
+
+        let newStats = totals.compactMapValues { t -> MetricStats? in
+            guard t.count > 0, t.min != .infinity else { return nil }
+            return MetricStats(avg: t.sum / Double(t.count), min: t.min, max: t.max, count: t.count, sortedValues: t.values.sorted())
+        }
+        // Only overwrite if we actually found data — preserves mock-seeded stats in DEBUG mode.
+        if !newStats.isEmpty { activityMonthlyStats = newStats }
+    }
+
+    private func refreshTagInsights() async {
+        guard let tagStore, !tagStore.availableTags.isEmpty else { return }
+        tagCorrelations = await tagInsightEngine.compute(tagStore: tagStore, localStore: localStore)
     }
 
     private func loadTrendHistory() async {

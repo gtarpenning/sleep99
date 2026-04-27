@@ -105,6 +105,14 @@ struct SleepDashboardView: View {
                     }
                 }
 
+                // Insights (tag correlations + activity)
+                InsightsBlockView(
+                    tagCorrelations: viewModel.tagCorrelations,
+                    activitySnapshot: viewModel.activitySnapshot,
+                    activityMonthlyStats: viewModel.activityMonthlyStats,
+                    selectedDate: viewModel.selectedDate
+                )
+
                 // Trend
                 ScoreTrendsSectionView(viewModel: viewModel)
                     .padding(.horizontal, 20)

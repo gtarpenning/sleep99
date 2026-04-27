@@ -16,6 +16,44 @@ struct SignalOverlayChartView: View {
                 }
             }
 
+            // Lowest HR marker — subtle enlarged dot at the minimum heart rate point
+            if let hrSeries = series.first(where: { $0.title == "Heart Rate" }),
+               let minPoint = hrSeries.points.min(by: { $0.value < $1.value }) {
+                PointMark(
+                    x: .value("Time", minPoint.date),
+                    y: .value("HR Low", minPoint.value)
+                )
+                .symbolSize(72)
+                .foregroundStyle(hrColor.opacity(0.55))
+                .annotation(position: .bottom, spacing: 2) {
+                    Text("\(Int(minPoint.value.rounded()))")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundStyle(hrColor.opacity(0.7))
+                }
+            }
+
+            // Apnea event marker — dot + label at the peak RR point when significantly elevated
+            if let rrSeries = series.first(where: { $0.title == "Respiratory Rate" }),
+               let peakPoint = rrSeries.points.max(by: { $0.value < $1.value }),
+               peakPoint.value > 18 {
+                PointMark(
+                    x: .value("Time", peakPoint.date),
+                    y: .value("RR Peak", peakPoint.value)
+                )
+                .symbolSize(72)
+                .foregroundStyle(rrColor.opacity(0.55))
+                .annotation(position: .top, spacing: 2) {
+                    VStack(spacing: 0) {
+                        Text("apnea")
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundStyle(rrColor.opacity(0.65))
+                        Text("\(Int(peakPoint.value.rounded()))")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundStyle(rrColor.opacity(0.8))
+                    }
+                }
+            }
+
             if let selectedDate {
                 RuleMark(x: .value("Selected", selectedDate))
                     .foregroundStyle(.secondary.opacity(0.6))

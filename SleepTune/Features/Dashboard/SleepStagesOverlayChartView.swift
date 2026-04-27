@@ -18,7 +18,7 @@ import Charts
 // Signal colors — shared between toggles, chart lines, and tooltip
 let hrColor:  Color = Color(red: 1.0, green: 0.42, blue: 0.42)
 let hrvColor: Color = Color(red: 0.22, green: 1.0, blue: 0.42)
-let rrColor:  Color = Color(red: 0.48, green: 0.36, blue: 0.96)
+let rrColor:  Color = Color(red: 0.15, green: 0.85, blue: 0.88)
 
 func signalColor(for title: String) -> Color {
     switch title {

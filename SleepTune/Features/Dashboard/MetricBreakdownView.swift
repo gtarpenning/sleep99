@@ -146,7 +146,7 @@ func formatted(value: Double, unit: String, metricName: String? = nil) -> String
     case "%":
         let precision = metricName == "Blood Oxygen" ? 1 : 0
         return "\(value.formatted(.number.precision(.fractionLength(precision))))%"
-    case "ms", "bpm", "min":
+    case "ms", "bpm", "min", "x", "cycles", "events":
         return "\(Int(value.rounded())) \(unit)"
     case "br/min":
         return "\(value.formatted(.number.precision(.fractionLength(1)))) br/min"
@@ -264,18 +264,20 @@ struct MetricContributionRow: View {
         metric.normalizedScore >= 80 ? DS.green : DS.purple
     }
 
-    /// Subtitle: show actual 30d average (transparent) + delta tonight; fall back to static hint.
+    /// Subtitle: show scoring target (effectiveBaseline for p-based metrics, mean for others) + delta.
     private var subtitle: (text: String, color: Color)? {
         if let stats = metric.stats, stats.count > 0 {
-            let avgText = "avg \(compactValueText(value: stats.avg, unit: metric.unit, metricName: metric.name))"
-            let delta = metric.rawValue - stats.avg
-            let threshold: Double = metric.unit == "fraction" ? 0.05 : 0.5
+            // Use the actual scoring reference so users see what they're being graded against.
+            let refValue = effectiveBaseline(name: metric.name, stats: stats) ?? stats.avg
+            let refLabel = metric.target != nil ? "target" : "avg"
+            let refText = "\(refLabel) \(compactValueText(value: refValue, unit: metric.unit, metricName: metric.name))"
+            let delta = metric.rawValue - refValue
+            let threshold = displayPrecisionThreshold(for: metric.unit, metricName: metric.name)
             if abs(delta) < threshold {
-                return (avgText, DS.textTertiary)
+                return (refText, DS.textTertiary)
             }
-            // Build delta string
             let deltaText = compactDeltaText(delta: delta, unit: metric.unit, metricName: metric.name)
-            return ("\(avgText) (\(deltaText) tonight)", DS.textTertiary)
+            return ("\(refText) (\(deltaText) tonight)", DS.textTertiary)
         } else if let hint = metric.hint {
             return (hint, DS.textTertiary)
         }
@@ -284,7 +286,7 @@ struct MetricContributionRow: View {
 
     private func compactValueText(value: Double, unit: String, metricName: String) -> String {
         switch unit {
-        case "ms", "bpm", "min":
+        case "ms", "bpm", "min", "x", "cycles", "events":
             return "\(Int(value.rounded()))\(unit)"
         case "br/min":
             return "\(value.formatted(.number.precision(.fractionLength(1))))br/min"

@@ -3,6 +3,7 @@ import SwiftUI
 struct AccountView: View {
     @Environment(AppContainer.self) private var container
     @State private var showSignOutConfirm = false
+    @State private var nameText: String = ""
 
     var body: some View {
         ZStack {
@@ -21,10 +22,14 @@ struct AccountView: View {
                             }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(container.authService.displayName ?? "You")
+                            TextField("Your name", text: $nameText)
                                 .font(.headline)
                                 .foregroundStyle(DS.textPrimary)
-                            Text("Apple ID")
+                                .submitLabel(.done)
+                                .onChange(of: nameText) { _, new in
+                                    container.authService.updateDisplayName(new)
+                                }
+                            Text("Shown in Family feed")
                                 .font(.caption)
                                 .foregroundStyle(DS.textSecondary)
                         }
@@ -52,6 +57,7 @@ struct AccountView: View {
         }
         .navigationTitle("Account")
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear { nameText = container.authService.displayName ?? "" }
         .confirmationDialog("Sign out of sleeptune?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 container.authService.signOut()

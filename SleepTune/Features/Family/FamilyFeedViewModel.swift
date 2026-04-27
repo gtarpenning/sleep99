@@ -77,9 +77,10 @@ final class FamilyFeedViewModel {
         member.isCurrentUser ? currentUserScore : scores[member.id]
     }
 
-    /// Returns (CKShare, CKContainer) for use inside UICloudSharingController's preparation handler.
-    /// Called only after the user picks a share method — network latency is hidden by composition time.
-    func makeShare() async throws -> (CKShare, CKContainer) {
+    /// Returns the raw CloudKit share URL for sharing via UIActivityViewController.
+    /// Avoids UICloudSharingController, which embeds the sender's build number and
+    /// triggers an App Store version check that fails for TestFlight builds.
+    func makeShareURL() async throws -> URL {
         guard authService.isSignedIn, let userID = authService.userID else {
             throw ShareError.notSignedIn
         }
@@ -90,7 +91,7 @@ final class FamilyFeedViewModel {
               !trimmedName.isEmpty else {
             throw ShareError.noName
         }
-        return try await cloudKitService.prepareShare(
+        let (share, _) = try await cloudKitService.prepareShare(
             score.toSummary(),
             totalMinutes: score.totalSleepMinutes,
             userID: userID,
@@ -98,6 +99,8 @@ final class FamilyFeedViewModel {
             avatarColor: "#5E5CE6",
             avatarEmoji: authService.avatarEmoji
         )
+        guard let url = share.url else { throw ShareError.noShareURL }
+        return url
     }
 
     /// Checks prerequisites before showing the share sheet. Sets shareError and returns false if unmet.
@@ -123,12 +126,14 @@ enum ShareError: LocalizedError {
     case notSignedIn
     case noScore
     case noName
+    case noShareURL
 
     var errorDescription: String? {
         switch self {
-        case .notSignedIn: return "Sign in with Apple to share your score."
-        case .noScore:     return "Open the Sleep tab and let your score load first."
-        case .noName:      return "Add your name in Settings → Account before sharing."
+        case .notSignedIn:  return "Sign in with Apple to share your score."
+        case .noScore:      return "Open the Sleep tab and let your score load first."
+        case .noName:       return "Add your name in Settings → Account before sharing."
+        case .noShareURL:   return "Couldn't get a share link. Try again in a moment."
         }
     }
 }

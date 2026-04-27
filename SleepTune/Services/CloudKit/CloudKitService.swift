@@ -183,7 +183,9 @@ actor CloudKitService {
         userID: String,
         displayName: String,
         avatarColor: String,
-        avatarEmoji: String? = nil
+        avatarEmoji: String? = nil,
+        avgHR: Int? = nil,
+        avgHRV: Int? = nil
     ) async throws {
         try await createZoneIfNeeded()
         let dateStamp = ISO8601DateFormatter().string(from: Calendar.current.startOfDay(for: summary.date))
@@ -204,6 +206,8 @@ actor CloudKitService {
         record["recoveryScore"]     = summary.recoveryScore
         record["totalSleepMinutes"] = totalMinutes
         record["primarySource"]     = summary.primarySource.rawValue
+        if let avgHR  { record["avgHR"]  = avgHR }
+        if let avgHRV { record["avgHRV"] = avgHRV }
         try await privateDB.save(record)
     }
 
@@ -250,7 +254,9 @@ actor CloudKitService {
                         // Values < 60 are impossible as real sleep minutes so treat them as hours.
                         return raw < 60 && raw > 0 ? raw * 60 : raw
                     }(),
-                    primarySource: SleepIndicatorSource(rawValue: record["primarySource"] as? String ?? "") ?? .appleHealth
+                    primarySource: SleepIndicatorSource(rawValue: record["primarySource"] as? String ?? "") ?? .appleHealth,
+                    avgHR:  record["avgHR"]  as? Int,
+                    avgHRV: record["avgHRV"] as? Int
                 )
 
                 if let existing = latestByMember[memberID], existing.1.date >= dailyScore.date {

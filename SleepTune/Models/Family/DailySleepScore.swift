@@ -9,6 +9,8 @@ struct DailySleepScore: Identifiable, Hashable {
     var recoveryScore: Double
     var totalSleepMinutes: Int
     var primarySource: SleepIndicatorSource
+    var avgHR: Int?
+    var avgHRV: Int?
 
     func toSummary() -> SleepScoreSummary {
         SleepScoreSummary(date: date, score: score, trend: 0,

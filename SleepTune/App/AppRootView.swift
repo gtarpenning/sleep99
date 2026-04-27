@@ -36,6 +36,8 @@ struct AppRootView: View {
 
         let totalMinutes = dash.indicators.first(where: { $0.name == "Sleep Duration" })
             .map { Int($0.value * 60) } ?? 0
+        let avgHR  = dash.indicators.first(where: { $0.name == "Overnight Heart Rate" }).map { Int($0.value.rounded()) }
+        let avgHRV = dash.indicators.first(where: { $0.name == "HRV" }).map { Int($0.value.rounded()) }
         container.familyFeedViewModel.currentUserScore = DailySleepScore(
             id: "current-user",
             memberID: container.authService.userID ?? "me",
@@ -44,7 +46,9 @@ struct AppRootView: View {
             sleepScore: dash.summary.sleepScore,
             recoveryScore: dash.summary.recoveryScore,
             totalSleepMinutes: totalMinutes,
-            primarySource: .appleHealth
+            primarySource: .appleHealth,
+            avgHR: avgHR,
+            avgHRV: avgHRV
         )
     }
 }
