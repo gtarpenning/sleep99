@@ -44,6 +44,9 @@ private enum SharedStore {
 
 // MARK: - Colors (self-contained; mirror the app's design system)
 
+// Slightly brighter than system `.secondary` for the small gray labels.
+private let labelGray = Color(white: 0.74)
+
 private let hrColor  = Color(red: 1.00, green: 0.42, blue: 0.42)
 private let hrvColor = Color(red: 0.22, green: 1.00, blue: 0.42)
 private let rrColor  = Color(red: 0.15, green: 0.85, blue: 0.88)
@@ -137,11 +140,11 @@ struct ScoreWidgetEntryView: View {
             HStack(spacing: 4) {
                 Image(systemName: "moon.stars.fill")
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(labelGray)
                 Text("SLEEP")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.6)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(labelGray)
             }
 
             if let s = entry.snapshot {
@@ -153,7 +156,7 @@ struct ScoreWidgetEntryView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "bed.double.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(labelGray)
                     Text(sleepLabel(minutes: s.totalSleepMinutes))
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
@@ -185,7 +188,7 @@ struct ScoreWidgetEntryView: View {
                     Text("SLEEP")
                         .font(.system(size: 10, weight: .bold))
                         .tracking(0.6)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(labelGray)
                     Text("\(Int(s.score.rounded()))")
                         .font(.system(size: 44, weight: .bold, design: .rounded))
                         .foregroundStyle(scoreColor(s.score))
@@ -193,7 +196,7 @@ struct ScoreWidgetEntryView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "bed.double.fill")
                             .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(labelGray)
                         Text(sleepLabel(minutes: s.totalSleepMinutes))
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundStyle(.primary)
@@ -233,7 +236,7 @@ struct ScoreWidgetEntryView: View {
             Circle().fill(color).frame(width: 5, height: 5)
             Text(label)
                 .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(labelGray)
         }
     }
 
@@ -241,7 +244,7 @@ struct ScoreWidgetEntryView: View {
         HStack(spacing: 5) {
             Text(label)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(labelGray)
                 .lineLimit(1)
             Spacer(minLength: 2)
             Text("\(Int(value.rounded()))")
@@ -272,10 +275,10 @@ struct ScoreWidgetEntryView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("—")
                 .font(.system(size: 44, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(labelGray)
             Text("Open SleepTune")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(labelGray)
         }
     }
 }
