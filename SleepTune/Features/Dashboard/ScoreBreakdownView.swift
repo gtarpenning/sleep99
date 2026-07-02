@@ -75,7 +75,8 @@ struct ScoreBreakdownView: View {
             let ampm = h < 12 ? "AM" : "PM"
             let displayH = h == 0 ? 12 : h > 12 ? h - 12 : h
             return String(format: "%d:%02d %@", displayH, m, ampm)
-        case "%", "ms", "bpm": return "\(Int(v.rounded())) \(i.unit)"
+        case "%":        return "\(Int(v.rounded())) \(i.unit)"
+        case "ms", "bpm": return "\(v.formatted(.number.precision(.fractionLength(1)))) \(i.unit)"
         case "br/min":
             return "\(v.formatted(.number.precision(.fractionLength(1)))) \(i.unit)"
         default:         return String(format: "%.1f \(i.unit)", v)

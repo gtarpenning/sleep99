@@ -2,7 +2,7 @@ import XCTest
 @testable import SleepTune
 
 final class MetricProfilesTests: XCTestCase {
-    func testMetricTargetGuidanceUsesBestTenPercentForOvernightHeartRate() {
+    func testMetricTargetGuidanceUsesTopQuartileForOvernightHeartRate() {
         let stats = MetricStats(
             avg: 50,
             min: 45,
@@ -13,8 +13,9 @@ final class MetricProfilesTests: XCTestCase {
 
         let guidance = metricTargetGuidance(name: "Overnight Heart Rate", stats: stats)
 
-        XCTAssertEqual(guidance?.value, 45.9, accuracy: 0.001)
-        XCTAssertEqual(guidance?.label, "Target set by your best 10% of nights over the last 30.")
+        XCTAssertNotNil(guidance)
+        XCTAssertEqual(guidance?.value ?? -1, 47.25, accuracy: 0.001)
+        XCTAssertEqual(guidance?.label, "Target set by your best 25% of nights over the last 30.")
     }
 
     func testMetricTargetGuidanceUsesUpperQuartileForHRV() {
@@ -28,7 +29,8 @@ final class MetricProfilesTests: XCTestCase {
 
         let guidance = metricTargetGuidance(name: "HRV", stats: stats)
 
-        XCTAssertEqual(guidance?.value, 70, accuracy: 0.001)
+        XCTAssertNotNil(guidance)
+        XCTAssertEqual(guidance?.value ?? -1, 70, accuracy: 0.001)
         XCTAssertEqual(guidance?.label, "Target set by your top quartile nights over the last 30.")
     }
 

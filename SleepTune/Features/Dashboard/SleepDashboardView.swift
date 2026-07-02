@@ -79,6 +79,11 @@ struct SleepDashboardView: View {
                     indicators: viewModel.indicators
                 )
 
+                // Rolling sleep debt (7-night)
+                if let debt = viewModel.sleepDebt {
+                    SleepDebtCardView(summary: debt)
+                }
+
                 // Full metric breakdown (expandable)
                 if !viewModel.indicators.isEmpty {
                     MetricBreakdownView(
@@ -116,6 +121,13 @@ struct SleepDashboardView: View {
                 // Trend
                 ScoreTrendsSectionView(viewModel: viewModel)
                     .padding(.horizontal, 20)
+
+                // Subjective "how did you sleep" rating
+                SubjectiveRatingButton(
+                    store: container.subjectiveRatingStore,
+                    date: viewModel.selectedDate
+                )
+                .padding(.horizontal, 20)
 
                 // Tags — at the very bottom, low friction
                 SleepTagBarView(store: container.tagStore, date: viewModel.selectedDate)

@@ -174,13 +174,17 @@ func scoreMetric(name: String, value: Double, monthlyAvg: Double?) -> Double? {
         case "Overnight Heart Rate":
             // avg is p25 (best 25% of nights = lowest HR quartile). At or below → perfect.
             // -10% per bpm above p25: +7 bpm → ~30% (≈ 5/15 pts).
-            if value <= avg + 1.0 { return 1 }   // 1-bpm display tolerance
+            // Full marks only when at/below target to 1-decimal display precision
+            // (0.05 epsilon), so a genuine 40.4 vs 40.0 miss costs a little.
+            if value <= avg + 0.05 { return 1 }
             return max(0, 1 - (value - avg) * 0.10)
 
         case "Lowest Overnight HR":
             // avg is the monthly minimum — a night-floor reference.
             // Gentle slope since matching your absolute best night is rare.
-            if value <= avg + 1.0 { return 1 }   // 1-bpm display tolerance
+            // Same 1-decimal boundary as Overnight Heart Rate: 41 vs a 40 floor
+            // (or 40.4 vs 40.0) loses points instead of rounding up to perfect.
+            if value <= avg + 0.05 { return 1 }
             return max(0, 1 - (value - avg) * 0.05)
 
         case "Respiratory Rate":

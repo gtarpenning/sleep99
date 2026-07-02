@@ -139,8 +139,14 @@ actor CloudKitService {
             share = CKShare(recordZoneID: zone.zoneID)
             share[CKShare.SystemFieldKey.title] = "My Sleep Score"
         }
-        // Keep sharing mode consistent: public read-only link sharing.
+        // Public read-only link sharing.
         share.publicPermission = .readOnly
+        // Clear any version metadata that UICloudSharingController may have written
+        // previously. CloudKit stores this on the share record, and iOS uses it to
+        // gate share acceptance via an App Store version lookup — which fails for
+        // TestFlight builds. Setting these to nil writes them as deletions.
+        share.setValue(nil, forKey: "applicationVersion")
+        share.setValue(nil, forKey: "minimumCompatibilityVersion")
 
         let op = CKModifyRecordsOperation(recordsToSave: [record, share])
         op.savePolicy = .changedKeys
@@ -171,6 +177,18 @@ actor CloudKitService {
             return (refreshed, container)
         }
         return (savedShare, container)
+    }
+
+    // MARK: - Reset share (recovery path for stuck shares)
+
+    /// Deletes the existing zone-level share record, forcing a fresh share to be
+    /// created on next prepareShare call. Use when a previous UICloudSharingController
+    /// run wrote stale version metadata that's blocking acceptance.
+    /// Existing accepted participants in the zone are NOT removed — only the share
+    /// itself is reset, and they'll re-link automatically when a new share is created.
+    func resetZoneShare() async throws {
+        let shareRecordID = CKRecord.ID(recordName: zoneShareRecordName, zoneID: zone.zoneID)
+        try? await privateDB.deleteRecord(withID: shareRecordID)
     }
 
     // MARK: - Publish only (background sync, no share)
