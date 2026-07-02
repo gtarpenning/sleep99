@@ -19,6 +19,9 @@ extension AppContainer {
         container.dashboardViewModel.scoreHistory = MockSleepData.scoreHistory
         container.dashboardViewModel.activitySnapshot = MockSleepData.activitySnapshot
         container.dashboardViewModel.tagCorrelations = MockSleepData.tagCorrelations
+        container.dashboardViewModel.sleepDebt = SleepDebtSummary(
+            totalDebt: 4.5, nightsCounted: 7, avgHours: 7.4, nightsAtOrAboveTarget: 2
+        )
 
         // Seed mock family members so the Family tab is previewable without CloudKit.
         container.familyFeedViewModel.members = [
@@ -47,6 +50,7 @@ final class AppContainer {
     let settingsViewModel: SettingsViewModel
     let familyFeedViewModel: FamilyFeedViewModel
     let tagStore: SleepTagStore
+    let subjectiveRatingStore: SubjectiveRatingStore
 
     private let healthKitClient: HealthKitClient
     private let scoreEngine: SleepScoreEngine
@@ -66,6 +70,7 @@ final class AppContainer {
         self.authService = auth
         self.cloudKitService = cloudKit
         self.tagStore = SleepTagStore()
+        self.subjectiveRatingStore = SubjectiveRatingStore()
 
         let vm = DashboardViewModel(
             healthKitClient: healthKitClient,

@@ -488,6 +488,15 @@ private extension HealthKitClient {
         let deepMinutes = deep / 60
         let coreMinutes = core / 60
 
+        // Detect whether the source actually provided per-stage breakdown data.
+        // Whoop and some 3rd-party apps only write `.asleepUnspecified`, in which case
+        // REM/Deep/Core indicators would all be 0. Emit only the ones we actually have
+        // — the score engine handles missing categories gracefully via its weight
+        // normalisation, so omitting these doesn't crater the sleep score.
+        let hasREM  = samples.contains { $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue }
+        let hasDeep = samples.contains { $0.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue }
+        let hasCore = samples.contains { $0.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue }
+
         var indicators: [SleepIndicator] = [
             SleepIndicator(
                 name: "Sleep Duration",
@@ -507,7 +516,10 @@ private extension HealthKitClient {
                 source: .appleHealth,
                 range: 70...98
             ),
-            SleepIndicator(
+        ]
+
+        if hasREM {
+            indicators.append(SleepIndicator(
                 name: "REM Sleep",
                 detail: "Absolute REM minutes",
                 value: remMinutes,
@@ -515,8 +527,10 @@ private extension HealthKitClient {
                 category: .sleepArchitecture,
                 source: .appleHealth,
                 range: 30...120
-            ),
-            SleepIndicator(
+            ))
+        }
+        if hasDeep {
+            indicators.append(SleepIndicator(
                 name: "Deep Sleep",
                 detail: "Absolute deep sleep minutes",
                 value: deepMinutes,
@@ -524,8 +538,10 @@ private extension HealthKitClient {
                 category: .sleepArchitecture,
                 source: .appleHealth,
                 range: 10...90
-            ),
-            SleepIndicator(
+            ))
+        }
+        if hasCore {
+            indicators.append(SleepIndicator(
                 name: "Core Sleep",
                 detail: "Absolute core sleep minutes",
                 value: coreMinutes,
@@ -533,8 +549,8 @@ private extension HealthKitClient {
                 category: .sleepArchitecture,
                 source: .appleHealth,
                 range: 60...240
-            ),
-        ]
+            ))
+        }
 
         if let sleepLatencyMinutes {
             indicators.append(SleepIndicator(
@@ -774,11 +790,10 @@ private extension HealthKitClient {
             ))
         }
 
-        // Apnea Events — count RR spikes ≥ 25% above nightly mean, grouped within 5 min.
-        // Uses the tight sleep-window predicate so daytime readings don't skew the mean.
-        // Apple Watch's RR is a smoothed signal (~1-min averages), so 1.5× is unreachable;
-        // 1.25× (e.g. 19 br/min on a 15 mean) catches genuine arousal/disturbance events.
-        // Emitted as sleepArchitecture so it surfaces in the Sleep section of the breakdown.
+        // Apnea Events — uses the shared ApneaDetector, which flags points
+        // ≥ max(mean + 2σ, mean + 3 br/min) above the nightly RR baseline and
+        // clusters nearby spikes into a single event. This is more sensitive
+        // than the previous fixed 25% multiplier and adapts per-user.
         let apneaEvents: Int? = await {
             guard let type = HKObjectType.quantityType(forIdentifier: .respiratoryRate) else { return nil }
             let rrUnit = HKUnit.count().unitDivided(by: .minute())
@@ -789,27 +804,17 @@ private extension HealthKitClient {
                 sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             )) ?? []
             guard rrSamples.count >= 10 else { return nil }
-            let values = rrSamples.map { $0.quantity.doubleValue(for: rrUnit) }
-            let mean = values.reduce(0, +) / Double(values.count)
-            let spikeThreshold = mean * 1.25
-            var count = 0
-            var lastSpikeEnd: Date? = nil
-            for sample in rrSamples {
-                guard sample.quantity.doubleValue(for: rrUnit) >= spikeThreshold else { continue }
-                if let last = lastSpikeEnd, sample.startDate.timeIntervalSince(last) < 5 * 60 {
-                    lastSpikeEnd = max(last, sample.endDate)
-                } else {
-                    count += 1
-                    lastSpikeEnd = sample.endDate
-                }
+            let points = rrSamples.map {
+                SleepChartPoint(date: $0.startDate, value: $0.quantity.doubleValue(for: rrUnit))
             }
-            return count > 0 ? count : nil
+            let events = ApneaDetector.detect(in: points)
+            return events.isEmpty ? nil : events.count
         }()
 
         if let events = apneaEvents {
             indicators.append(SleepIndicator(
                 name: "Apnea Events",
-                detail: "RR spikes ≥50% above nightly mean",
+                detail: "RR spikes ≥ 2σ above nightly baseline",
                 value: Double(events),
                 unit: "events",
                 category: .sleepArchitecture,
@@ -839,6 +844,22 @@ private extension HealthKitClient {
                 category: .recovery,
                 source: .appleWatch,
                 range: 33...36
+            ))
+        }
+
+        // Sleep Stress — derived from HR + HRV, displayed in Recovery section.
+        // Surfaced regardless of category weights since it's a composite signal.
+        let hrIndicator  = indicators.first(where: { $0.name == "Overnight Heart Rate" })
+        let hrvIndicator = indicators.first(where: { $0.name == "HRV" })
+        if let stress = SleepStress.compute(hr: hrIndicator?.value, hrv: hrvIndicator?.value) {
+            indicators.append(SleepIndicator(
+                name: "Sleep Stress",
+                detail: "Composite of overnight HR + HRV · lower is better",
+                value: stress,
+                unit: "score",
+                category: .recovery,
+                source: .appleWatch,
+                range: 0...100
             ))
         }
 

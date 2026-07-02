@@ -122,27 +122,70 @@ struct MetricDetailSheet: View {
             }
             .frame(height: 18)
 
-            if targetDiffersFromAvg {
-                // 4-label row: low · avg · target · high
+            // Position the target label on the same side of avg as the target tick on the bar.
+            // For higher-is-better metrics target lives to the right of avg (low · avg · target · high).
+            // For lower-is-better metrics it lives to the left (low · target · avg · high).
+            // When target collapses onto min/avg/max, drop to 3 labels and color that label as the target.
+            let lowStr    = formatted(value: stats.min, unit: metric.unit, metricName: metric.name)
+            let avgStr    = formatted(value: stats.avg, unit: metric.unit, metricName: metric.name)
+            let highStr   = formatted(value: stats.max, unit: metric.unit, metricName: metric.name)
+            let targetStr = formatted(value: target,    unit: metric.unit, metricName: metric.name)
+            let targetIsAtMin = abs(target - stats.min) <= 0.01 * max(abs(stats.min), 1)
+            let targetIsAtMax = abs(target - stats.max) <= 0.01 * max(abs(stats.max), 1)
+
+            if !targetDiffersFromAvg {
+                // 3-label row when target == avg — avg label IS the target.
+                HStack {
+                    rangeLabel(lowStr, subtitle: "30d low")
+                    Spacer()
+                    rangeLabel(avgStr, subtitle: "30d target", isTarget: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    Spacer()
+                    rangeLabel(highStr, subtitle: "30d high")
+                }
+            } else if targetIsAtMin {
+                // 3-label row when target == min (e.g. Lowest Overnight HR).
+                HStack {
+                    rangeLabel(lowStr, subtitle: "30d target", isTarget: true)
+                    Spacer()
+                    rangeLabel(avgStr, subtitle: "30d avg")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    Spacer()
+                    rangeLabel(highStr, subtitle: "30d high")
+                }
+            } else if targetIsAtMax {
+                // 3-label row when target == max.
+                HStack {
+                    rangeLabel(lowStr, subtitle: "30d low")
+                    Spacer()
+                    rangeLabel(avgStr, subtitle: "30d avg")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    Spacer()
+                    rangeLabel(highStr, subtitle: "30d target", isTarget: true)
+                }
+            } else if target < stats.avg {
+                // 4-label row, lower-is-better: low · target · avg · high.
                 HStack(spacing: 4) {
-                    rangeLabel(formatted(value: stats.min,  unit: metric.unit, metricName: metric.name), subtitle: "30d low")
+                    rangeLabel(lowStr,    subtitle: "30d low")
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    rangeLabel(formatted(value: stats.avg,  unit: metric.unit, metricName: metric.name), subtitle: "30d avg")
+                    rangeLabel(targetStr, subtitle: "30d target", isTarget: true)
                         .frame(maxWidth: .infinity, alignment: .center)
-                    rangeLabel(formatted(value: target,     unit: metric.unit, metricName: metric.name), subtitle: "30d target")
+                    rangeLabel(avgStr,    subtitle: "30d avg")
                         .frame(maxWidth: .infinity, alignment: .center)
-                    rangeLabel(formatted(value: stats.max,  unit: metric.unit, metricName: metric.name), subtitle: "30d high")
+                    rangeLabel(highStr,   subtitle: "30d high")
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             } else {
-                // 3-label row when target == avg
-                HStack {
-                    rangeLabel(formatted(value: stats.min, unit: metric.unit, metricName: metric.name), subtitle: "30d low")
-                    Spacer()
-                    rangeLabel(formatted(value: stats.avg, unit: metric.unit, metricName: metric.name), subtitle: "30d avg")
+                // 4-label row, higher-is-better: low · avg · target · high.
+                HStack(spacing: 4) {
+                    rangeLabel(lowStr,    subtitle: "30d low")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    rangeLabel(avgStr,    subtitle: "30d avg")
                         .frame(maxWidth: .infinity, alignment: .center)
-                    Spacer()
-                    rangeLabel(formatted(value: stats.max, unit: metric.unit, metricName: metric.name), subtitle: "30d high")
+                    rangeLabel(targetStr, subtitle: "30d target", isTarget: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    rangeLabel(highStr,   subtitle: "30d high")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
         }
@@ -151,16 +194,16 @@ struct MetricDetailSheet: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(DS.border, lineWidth: 0.5))
     }
 
-    private func rangeLabel(_ value: String, subtitle: String) -> some View {
+    private func rangeLabel(_ value: String, subtitle: String, isTarget: Bool = false) -> some View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                .foregroundStyle(subtitle == "30d target" ? DS.purple : DS.textPrimary)
+                .foregroundStyle(isTarget ? DS.purple : DS.textPrimary)
                 .monospacedDigit()
             Text(subtitle)
                 .font(.system(size: 9, weight: .medium))
                 .tracking(0.4)
-                .foregroundStyle(subtitle == "30d target" ? DS.purple.opacity(0.7) : DS.textTertiary)
+                .foregroundStyle(isTarget ? DS.purple.opacity(0.7) : DS.textTertiary)
         }
     }
 
@@ -290,7 +333,10 @@ private func formatted(value: Double, unit: String, signed: Bool, metricName: St
         return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(precision))))%"
     case "fraction":
         return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(2))))"
-    case "ms", "bpm", "min", "x", "cycles", "events":
+    case "ms", "bpm":
+        // HR / HRV to 1 decimal for a more precise readout (e.g. 40.4 bpm).
+        return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(1)))) \(unit)"
+    case "min", "x", "cycles", "events":
         return "\(prefix)\(Int(absoluteValue.rounded())) \(unit)"
     default:
         return "\(prefix)\(absoluteValue.formatted(.number.precision(.fractionLength(1)))) \(unit)"

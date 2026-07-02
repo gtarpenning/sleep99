@@ -39,6 +39,16 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "32B85101CE3E807A79306BF9"
+               BuildableName = "SleepTuneTests.xctest"
+               BlueprintName = "SleepTuneTests"
+               ReferencedContainer = "container:SleepTune.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

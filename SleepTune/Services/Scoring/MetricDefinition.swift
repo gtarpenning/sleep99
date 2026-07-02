@@ -149,6 +149,14 @@ enum MetricRegistry {
               scoring: .lowerIsBetterRelative(hardMaxDelta: 1.0),  // ≤ avg = perfect; avg+1°C = 0
               weight: 0.02, lowerIsBetter: true,
               hint: "cooler than your average is better"),
+
+        // Sleep Stress — composite of HR + HRV. Tracked & displayed but weight 0
+        // so it doesn't double-count with the HR and HRV metrics it derives from.
+        .init(name: "Sleep Stress",
+              category: .recovery,
+              scoring: .lowerIsBetter(idealMax: 25, hardMax: 75),
+              weight: 0, lowerIsBetter: true,
+              hint: "low autonomic stress is better"),
     ]
 
     // MARK: - Lookups

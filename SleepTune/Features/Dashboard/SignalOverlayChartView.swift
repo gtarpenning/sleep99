@@ -32,24 +32,27 @@ struct SignalOverlayChartView: View {
                 }
             }
 
-            // Apnea event marker — dot + label at the peak RR point when significantly elevated
-            if let rrSeries = series.first(where: { $0.title == "Respiratory Rate" }),
-               let peakPoint = rrSeries.points.max(by: { $0.value < $1.value }),
-               peakPoint.value > 18 {
-                PointMark(
-                    x: .value("Time", peakPoint.date),
-                    y: .value("RR Peak", peakPoint.value)
-                )
-                .symbolSize(72)
-                .foregroundStyle(rrColor.opacity(0.55))
-                .annotation(position: .top, spacing: 2) {
-                    VStack(spacing: 0) {
-                        Text("apnea")
-                            .font(.system(size: 7, weight: .medium))
-                            .foregroundStyle(rrColor.opacity(0.65))
-                        Text("\(Int(peakPoint.value.rounded()))")
-                            .font(.system(size: 9, weight: .semibold, design: .rounded))
-                            .foregroundStyle(rrColor.opacity(0.8))
+            // Apnea event markers — one dot per detected spike cluster.
+            // Threshold is baseline-relative (≥ 2σ above the night's mean RR, with a
+            // 3 br/min absolute floor) so it adapts to each user's normal range.
+            if let rrSeries = series.first(where: { $0.title == "Respiratory Rate" }) {
+                let events = ApneaDetector.detect(in: rrSeries.points)
+                ForEach(events, id: \.date) { event in
+                    PointMark(
+                        x: .value("Time", event.date),
+                        y: .value("Apnea", event.value)
+                    )
+                    .symbolSize(72)
+                    .foregroundStyle(rrColor.opacity(0.55))
+                    .annotation(position: .top, spacing: 2) {
+                        VStack(spacing: 0) {
+                            Text("apnea")
+                                .font(.system(size: 7, weight: .medium))
+                                .foregroundStyle(rrColor.opacity(0.65))
+                            Text("\(Int(event.value.rounded()))")
+                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .foregroundStyle(rrColor.opacity(0.8))
+                        }
                     }
                 }
             }

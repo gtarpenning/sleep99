@@ -5,6 +5,9 @@ struct SettingsView: View {
     @Environment(AppContainer.self) private var container
     @Environment(\.openURL) private var openURL
     @State private var showEmojiPicker = false
+    @State private var notificationsEnabled = false
+    @State private var resettingShare = false
+    @State private var resetShareMessage: String? = nil
 
     var body: some View {
         ZStack {
@@ -61,11 +64,89 @@ struct SettingsView: View {
                 }
                 .listRowBackground(DS.surface)
                 .listRowSeparatorTint(DS.border)
+
+                Section {
+                    Toggle("Daily reminder (10am)", isOn: $notificationsEnabled)
+                        .tint(DS.purple)
+                        .foregroundStyle(DS.textPrimary)
+                        .onChange(of: notificationsEnabled) { _, newValue in
+                            Task {
+                                let service = NotificationService()
+                                if newValue {
+                                    let granted = await service.enable()
+                                    if !granted {
+                                        notificationsEnabled = false
+                                    }
+                                } else {
+                                    await service.disable()
+                                }
+                            }
+                        }
+                } header: {
+                    Text("Notifications")
+                        .font(.footnote.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(DS.textTertiary)
+                        .textCase(.uppercase)
+                } footer: {
+                    Text("We'll remind you each morning to rate last night's sleep.")
+                        .font(.caption2)
+                        .foregroundStyle(DS.textTertiary)
+                }
+                .listRowBackground(DS.surface)
+                .listRowSeparatorTint(DS.border)
+
+                Section {
+                    Button {
+                        Task {
+                            resettingShare = true
+                            resetShareMessage = nil
+                            do {
+                                try await container.cloudKitService.resetZoneShare()
+                                resetShareMessage = "Share reset. Send a fresh invite link from the Family tab."
+                            } catch {
+                                resetShareMessage = "Couldn't reset: \(error.localizedDescription)"
+                            }
+                            resettingShare = false
+                        }
+                    } label: {
+                        HStack {
+                            Label("Reset Family Share", systemImage: "arrow.counterclockwise.circle")
+                                .foregroundStyle(DS.textPrimary)
+                            Spacer()
+                            if resettingShare { ProgressView().tint(DS.textSecondary).scaleEffect(0.8) }
+                        }
+                    }
+                    .disabled(resettingShare)
+                } header: {
+                    Text("Family")
+                        .font(.footnote.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(DS.textTertiary)
+                        .textCase(.uppercase)
+                } footer: {
+                    if let msg = resetShareMessage {
+                        Text(msg)
+                            .font(.caption2)
+                            .foregroundStyle(DS.textSecondary)
+                    } else {
+                        Text("If invite links aren't working, reset and send a fresh one.")
+                            .font(.caption2)
+                            .foregroundStyle(DS.textTertiary)
+                    }
+                }
+                .listRowBackground(DS.surface)
+                .listRowSeparatorTint(DS.border)
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
         }
-        .task { await viewModel.refreshHealthAuthorizationState() }
+        .task {
+            await viewModel.refreshHealthAuthorizationState()
+            let service = NotificationService()
+            let status = await service.currentAuthorizationStatus()
+            notificationsEnabled = service.isEnabled && (status == .authorized || status == .provisional)
+        }
         .navigationTitle("Settings")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .sheet(isPresented: $showEmojiPicker) { EmojiPickerView() }

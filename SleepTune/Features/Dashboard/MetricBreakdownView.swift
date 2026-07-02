@@ -146,7 +146,10 @@ func formatted(value: Double, unit: String, metricName: String? = nil) -> String
     case "%":
         let precision = metricName == "Blood Oxygen" ? 1 : 0
         return "\(value.formatted(.number.precision(.fractionLength(precision))))%"
-    case "ms", "bpm", "min", "x", "cycles", "events":
+    case "ms", "bpm":
+        // HR / HRV to 1 decimal — reads more precise/professional (e.g. 40.4 bpm).
+        return "\(value.formatted(.number.precision(.fractionLength(1)))) \(unit)"
+    case "min", "x", "cycles", "events":
         return "\(Int(value.rounded())) \(unit)"
     case "br/min":
         return "\(value.formatted(.number.precision(.fractionLength(1)))) br/min"

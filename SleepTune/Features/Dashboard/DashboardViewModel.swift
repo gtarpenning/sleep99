@@ -20,6 +20,7 @@ final class DashboardViewModel {
     var trendRange: SleepScoreTrendRange
     var monthlyStats: [String: MetricStats] = [:]
     var activityMonthlyStats: [String: MetricStats] = [:]
+    var sleepDebt: SleepDebtSummary?
 
     /// Effective baselines for scoreMetric() — delegates to effectiveBaseline() which is
     /// the single source of truth for aspirational percentile targets across all metrics.
@@ -174,16 +175,33 @@ final class DashboardViewModel {
         guard authorizationState == .authorized else { return }
         summary = scoreEngine.score(indicators: indicators, weights: .default, monthlyAverages: monthlyAverages)
         let capturedSummary = summary
+        let capturedIndicators = indicators
+        let capturedDate = selectedDate
         Task { @MainActor in
             await localStore.saveScore(
                 capturedSummary.score,
                 sleepScore: capturedSummary.sleepScore,
                 recoveryScore: capturedSummary.recoveryScore,
-                for: selectedDate
+                for: capturedDate
             )
             await loadTrendHistory()
+            await loadSleepDebt()
             await publishToCloudKit(capturedSummary)
             await refreshTagInsights()
+            // Write the widget snapshot only for today's score so the Home Screen
+            // doesn't reflect whichever historical date the user is browsing.
+            if Calendar.current.isDateInToday(capturedDate) {
+                let totalMinutes = capturedIndicators
+                    .first(where: { $0.name == "Sleep Duration" })
+                    .map { Int($0.value * 60) } ?? 0
+                WidgetSnapshotStore.save(WidgetSnapshot(
+                    updatedAt: Date(),
+                    score: capturedSummary.score,
+                    sleepScore: capturedSummary.sleepScore,
+                    recoveryScore: capturedSummary.recoveryScore,
+                    totalSleepMinutes: totalMinutes
+                ))
+            }
         }
     }
 
@@ -434,9 +452,30 @@ final class DashboardViewModel {
         if !newStats.isEmpty { activityMonthlyStats = newStats }
     }
 
+    private func loadSleepDebt() async {
+        let cal = Calendar.current
+        let today = Date()
+        var nights: [SleepDebtNight] = []
+        for offset in 1...7 {
+            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
+            let indicators = await localStore.loadIndicators(for: day)
+            guard let duration = indicators.first(where: { $0.name == "Sleep Duration" })?.value else { continue }
+            let activity = await localStore.loadActivitySnapshot(for: day)
+            nights.append(SleepDebtNight(date: day, hours: duration, exerciseMinutes: activity?.exerciseMinutes))
+        }
+        guard !nights.isEmpty else { return }
+        sleepDebt = SleepDebt.compute(nights: nights)
+    }
+
     private func refreshTagInsights() async {
-        guard let tagStore, !tagStore.availableTags.isEmpty else { return }
-        tagCorrelations = await tagInsightEngine.compute(tagStore: tagStore, localStore: localStore)
+        var correlations: [TagCorrelation] = []
+        if let tagStore, !tagStore.availableTags.isEmpty {
+            correlations = await tagInsightEngine.compute(tagStore: tagStore, localStore: localStore)
+        }
+        // Activity-level correlation (active vs rest days) — independent of user tags,
+        // so it surfaces even before the user has tagged any nights.
+        let activityCorrelations = await tagInsightEngine.computeActivityCorrelations(localStore: localStore)
+        tagCorrelations = correlations + activityCorrelations
     }
 
     private func loadTrendHistory() async {

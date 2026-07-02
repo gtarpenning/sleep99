@@ -25,3 +25,6 @@ package-lock.json
 # Misc
 .cache/
 *.orig
+
+# Serena tool cache
+.serena/
