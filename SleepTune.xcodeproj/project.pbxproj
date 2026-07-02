@@ -32,16 +32,6 @@
 		3AA642B4E5E97ECEEA9DEC6C /* MetricDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09928542E752B82560422300 /* MetricDefinition.swift */; };
 		4350D1A85FE384B034A4475C /* ScoreHeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01E410F7AAE8FD210F8B333E /* ScoreHeroView.swift */; };
 		4D5E6F7A8B9C0D1E2F3A4B5C /* TagInsightEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4D5E6F7A8B9C0D1E2F3A4B /* TagInsightEngine.swift */; };
-		AAAA0001000000000000A001 /* ApneaDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0001000000000000A001 /* ApneaDetector.swift */; };
-		AAAA0002000000000000A002 /* SleepStress.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002000000000000A002 /* SleepStress.swift */; };
-		AAAA0003000000000000A003 /* SleepDebt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0003000000000000A003 /* SleepDebt.swift */; };
-		AAAA0004000000000000A004 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0004000000000000A004 /* NotificationService.swift */; };
-		AAAA0005000000000000A005 /* SubjectiveRatingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0005000000000000A005 /* SubjectiveRatingStore.swift */; };
-		AAAA0006000000000000A006 /* SubjectiveRatingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0006000000000000A006 /* SubjectiveRatingSheet.swift */; };
-		AAAA0007000000000000A007 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0007000000000000A007 /* WidgetSnapshotStore.swift */; };
-		AAAA000C000000000000A00C /* SleepDebtCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB000C000000000000A00C /* SleepDebtCardView.swift */; };
-		DDDD00000000000000000002 /* ScoreWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDD00000000000000000001 /* ScoreWidget.swift */; };
-		DDDD0000000000000000000C /* SleepTuneWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = DDDD00000000000000000004 /* SleepTuneWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4E3D57802C83F3D10688F3AC /* SettingsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FC2B39B2A9FFFA285DC022 /* SettingsDestination.swift */; };
 		4E83AF1F6C0BE6B5F084C390 /* Date+StartOfDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3D13426CC3E44970A750B2 /* Date+StartOfDay.swift */; };
 		510055C0E60B4C48C7D9404E /* ScoreBreakdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60F5D19B3226C53F21DA7B6 /* ScoreBreakdownView.swift */; };
@@ -74,6 +64,18 @@
 		A2C3D4E5F6A7B8C9D0E1F2A3 /* DailyActivitySnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* DailyActivitySnapshot.swift */; };
 		A5A40DB7201278FFCCDE2CDB /* FamilyFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58AB51073F3E1A408737619 /* FamilyFeedView.swift */; };
 		A9CF1742761DF17AD41C828A /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 263D00C1D4FA9142A01573C2 /* AppContainer.swift */; };
+		AAAA0001000000000000A001 /* ApneaDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0001000000000000A001 /* ApneaDetector.swift */; };
+		AAAA0002000000000000A002 /* SleepStress.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002000000000000A002 /* SleepStress.swift */; };
+		AAAA0003000000000000A003 /* SleepDebt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0003000000000000A003 /* SleepDebt.swift */; };
+		AAAA0004000000000000A004 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0004000000000000A004 /* NotificationService.swift */; };
+		AAAA0005000000000000A005 /* SubjectiveRatingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0005000000000000A005 /* SubjectiveRatingStore.swift */; };
+		AAAA0006000000000000A006 /* SubjectiveRatingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0006000000000000A006 /* SubjectiveRatingSheet.swift */; };
+		AAAA0007000000000000A007 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0007000000000000A007 /* WidgetSnapshotStore.swift */; };
+		AAAA0008000000000000A008 /* ApneaDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0008000000000000A008 /* ApneaDetectorTests.swift */; };
+		AAAA0009000000000000A009 /* SleepStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0009000000000000A009 /* SleepStressTests.swift */; };
+		AAAA000A000000000000A00A /* SleepDebtTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB000A000000000000A00A /* SleepDebtTests.swift */; };
+		AAAA000B000000000000A00B /* MetricProfilesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB000B000000000000A00B /* MetricProfilesTests.swift */; };
+		AAAA000C000000000000A00C /* SleepDebtCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB000C000000000000A00C /* SleepDebtCardView.swift */; };
 		AC789AEC9C132959FFB22944 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97A23EF9AF36225E44BC6F5E /* HealthKit.framework */; };
 		AE6C7263BFC18D517B321DA4 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0998A5B022DE0E3B35BA5745 /* SettingsViewModel.swift */; };
 		AFB7538AF5D3F46022E2D7D7 /* DopplerStripeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1DF06D15A443D5C07C933D5 /* DopplerStripeView.swift */; };
@@ -86,11 +88,9 @@
 		D1417F182013D99ACDBBBB97 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6970CF4E7A866B73B7948B29 /* SignInView.swift */; };
 		D2CFC55D0AC3851660B87F99 /* SleepSignalReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = 556A1471B27C09B2CCD4DBF9 /* SleepSignalReading.swift */; };
 		D88531F1FEAE6DBCD5768F20 /* SignalOverlayChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286056DD7A153ABA9A613BC8 /* SignalOverlayChartView.swift */; };
+		DDDD00000000000000000002 /* ScoreWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDD00000000000000000001 /* ScoreWidget.swift */; };
+		DDDD0000000000000000000C /* SleepTuneWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DDDD00000000000000000004 /* SleepTuneWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E20F30C0BC78B8430CADF2DC /* SleepScoreEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8E63173E63ED2B36D0DF07 /* SleepScoreEngineTests.swift */; };
-		AAAA0008000000000000A008 /* ApneaDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0008000000000000A008 /* ApneaDetectorTests.swift */; };
-		AAAA0009000000000000A009 /* SleepStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0009000000000000A009 /* SleepStressTests.swift */; };
-		AAAA000A000000000000A00A /* SleepDebtTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB000A000000000000A00A /* SleepDebtTests.swift */; };
-		AAAA000B000000000000A00B /* MetricProfilesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB000B000000000000A00B /* MetricProfilesTests.swift */; };
 		E2FF77710250CB8B1AE18A7C /* MetricProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C45927DB747AB48BE8B68B4 /* MetricProfiles.swift */; };
 		E3901DADA81D1E9642CC2F4F /* LocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DA7B090374DFCA980C193D8 /* LocalStore.swift */; };
 		E4FEBBF5868F91B21FED1079 /* MetricStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77590112275E2A5C6D5B4BCA /* MetricStats.swift */; };
@@ -102,13 +102,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		FCAE7DEB4070760F63526A7E /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = CC01A07E15AA2F6E3DADE917 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = EED1DA841029F662CD89CFE6;
-			remoteInfo = SleepTune;
-		};
 		DDDD0000000000000000000E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CC01A07E15AA2F6E3DADE917 /* Project object */;
@@ -116,14 +109,35 @@
 			remoteGlobalIDString = DDDD0000000000000000000D;
 			remoteInfo = SleepTuneWidgetExtension;
 		};
+		FCAE7DEB4070760F63526A7E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CC01A07E15AA2F6E3DADE917 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EED1DA841029F662CD89CFE6;
+			remoteInfo = SleepTune;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DDDD0000000000000000000B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DDDD0000000000000000000C /* SleepTuneWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		01E410F7AAE8FD210F8B333E /* ScoreHeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreHeroView.swift; sourceTree = "<group>"; };
 		02ED4BD0D3D8F8DF90BB60F4 /* SleepStageChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStageChartView.swift; sourceTree = "<group>"; };
 		09928542E752B82560422300 /* MetricDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricDefinition.swift; sourceTree = "<group>"; };
 		0998A5B022DE0E3B35BA5745 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
-		0E5F76E07D9EEC5B2F64A6A3 /* SleepTuneTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SleepTuneTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0E5F76E07D9EEC5B2F64A6A3 /* SleepTuneTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SleepTuneTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		14B87C6A1304A329996FB056 /* DailySleepScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailySleepScore.swift; sourceTree = "<group>"; };
 		1A2B3C4D5E6F7A8B9C0D1E2F /* TagCorrelation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagCorrelation.swift; sourceTree = "<group>"; };
 		1B6F51DC6FFCBCE514D6F88A /* NSPredicate+Sendable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPredicate+Sendable.swift"; sourceTree = "<group>"; };
@@ -144,26 +158,10 @@
 		3A1D144D13045D163472557D /* SleepChartPoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepChartPoint.swift; sourceTree = "<group>"; };
 		3B0BEA375C89E5F2BE91D408 /* FamilyMemberDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberDashboardView.swift; sourceTree = "<group>"; };
 		3C4D5E6F7A8B9C0D1E2F3A4B /* TagInsightEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagInsightEngine.swift; sourceTree = "<group>"; };
-		BBBB0001000000000000A001 /* ApneaDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApneaDetector.swift; sourceTree = "<group>"; };
-		BBBB0002000000000000A002 /* SleepStress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStress.swift; sourceTree = "<group>"; };
-		BBBB0003000000000000A003 /* SleepDebt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDebt.swift; sourceTree = "<group>"; };
-		BBBB0004000000000000A004 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		BBBB0005000000000000A005 /* SubjectiveRatingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectiveRatingStore.swift; sourceTree = "<group>"; };
-		BBBB0006000000000000A006 /* SubjectiveRatingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectiveRatingSheet.swift; sourceTree = "<group>"; };
-		BBBB0007000000000000A007 /* WidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStore.swift; sourceTree = "<group>"; };
-		BBBB000C000000000000A00C /* SleepDebtCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDebtCardView.swift; sourceTree = "<group>"; };
-		DDDD00000000000000000001 /* ScoreWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreWidget.swift; sourceTree = "<group>"; };
-		DDDD00000000000000000004 /* SleepTuneWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SleepTuneWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		DDDD00000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		DDDD00000000000000000006 /* SleepTuneWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SleepTuneWidget.entitlements; sourceTree = "<group>"; };
 		428CEA0CCFCAB50D125DC085 /* SleepStagesOverlayChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStagesOverlayChartView.swift; sourceTree = "<group>"; };
 		488E98437B556F1D3E16632C /* SleepTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTag.swift; sourceTree = "<group>"; };
 		4B7BDF3D679F7B9496309A4A /* HealthAuthorizationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthAuthorizationState.swift; sourceTree = "<group>"; };
 		4B8E63173E63ED2B36D0DF07 /* SleepScoreEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScoreEngineTests.swift; sourceTree = "<group>"; };
-		BBBB0008000000000000A008 /* ApneaDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApneaDetectorTests.swift; sourceTree = "<group>"; };
-		BBBB0009000000000000A009 /* SleepStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStressTests.swift; sourceTree = "<group>"; };
-		BBBB000A000000000000A00A /* SleepDebtTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDebtTests.swift; sourceTree = "<group>"; };
-		BBBB000B000000000000A00B /* MetricProfilesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricProfilesTests.swift; sourceTree = "<group>"; };
 		4CAF86945DB5CAE0340CA5D7 /* SleepInsightImpact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepInsightImpact.swift; sourceTree = "<group>"; };
 		4D3D13426CC3E44970A750B2 /* Date+StartOfDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+StartOfDay.swift"; sourceTree = "<group>"; };
 		4D936F22E9B33FC890C51A69 /* SleepScoreTrendRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepScoreTrendRange.swift; sourceTree = "<group>"; };
@@ -200,11 +198,27 @@
 		AD8C81117A3269261D1F10DE /* MockSleepData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockSleepData.swift; sourceTree = "<group>"; };
 		B3C4D5E6F7A8B9C0D1E2F3A4 /* DailyActivitySnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyActivitySnapshot.swift; sourceTree = "<group>"; };
 		B915CE8D651628EEEB852088 /* SleepIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepIndicator.swift; sourceTree = "<group>"; };
+		BBBB0001000000000000A001 /* ApneaDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApneaDetector.swift; sourceTree = "<group>"; };
+		BBBB0002000000000000A002 /* SleepStress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStress.swift; sourceTree = "<group>"; };
+		BBBB0003000000000000A003 /* SleepDebt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDebt.swift; sourceTree = "<group>"; };
+		BBBB0004000000000000A004 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		BBBB0005000000000000A005 /* SubjectiveRatingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectiveRatingStore.swift; sourceTree = "<group>"; };
+		BBBB0006000000000000A006 /* SubjectiveRatingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectiveRatingSheet.swift; sourceTree = "<group>"; };
+		BBBB0007000000000000A007 /* WidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStore.swift; sourceTree = "<group>"; };
+		BBBB0008000000000000A008 /* ApneaDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApneaDetectorTests.swift; sourceTree = "<group>"; };
+		BBBB0009000000000000A009 /* SleepStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStressTests.swift; sourceTree = "<group>"; };
+		BBBB000A000000000000A00A /* SleepDebtTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDebtTests.swift; sourceTree = "<group>"; };
+		BBBB000B000000000000A00B /* MetricProfilesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricProfilesTests.swift; sourceTree = "<group>"; };
+		BBBB000C000000000000A00C /* SleepDebtCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepDebtCardView.swift; sourceTree = "<group>"; };
 		BD6CE4A711F16D7EC215D648 /* SleepChartSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepChartSeries.swift; sourceTree = "<group>"; };
 		C332281F5D2548006EE4875F /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = System/Library/Frameworks/CloudKit.framework; sourceTree = SDKROOT; };
 		CAED741DDAFB7E00B985982F /* SleepTune.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SleepTune.entitlements; sourceTree = "<group>"; };
 		CC0DFB4616F9B90768099BDD /* HealthKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitClient.swift; sourceTree = "<group>"; };
 		D15E97DD8536AEBB6E0F0B74 /* SleepTune.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SleepTune.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDDD00000000000000000001 /* ScoreWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreWidget.swift; sourceTree = "<group>"; };
+		DDDD00000000000000000004 /* SleepTuneWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SleepTuneWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDDD00000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		DDDD00000000000000000006 /* SleepTuneWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SleepTuneWidget.entitlements; sourceTree = "<group>"; };
 		DE8A6BAAB15BE1E42BBDC05B /* FamilyFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyFeedViewModel.swift; sourceTree = "<group>"; };
 		E0BAFB1AD9FD4D275B72D666 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		E58AB51073F3E1A408737619 /* FamilyFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyFeedView.swift; sourceTree = "<group>"; };
@@ -360,16 +374,6 @@
 			);
 			sourceTree = "<group>";
 		};
-		DDDD00000000000000000007 /* SleepTuneWidget */ = {
-			isa = PBXGroup;
-			children = (
-				DDDD00000000000000000001 /* ScoreWidget.swift */,
-				DDDD00000000000000000005 /* Info.plist */,
-				DDDD00000000000000000006 /* SleepTuneWidget.entitlements */,
-			);
-			path = SleepTuneWidget;
-			sourceTree = "<group>";
-		};
 		47DAE422777DC1D580F160F4 /* Features */ = {
 			isa = PBXGroup;
 			children = (
@@ -496,6 +500,16 @@
 			path = SleepTune/Tests;
 			sourceTree = "<group>";
 		};
+		DDDD00000000000000000007 /* SleepTuneWidget */ = {
+			isa = PBXGroup;
+			children = (
+				DDDD00000000000000000001 /* ScoreWidget.swift */,
+				DDDD00000000000000000005 /* Info.plist */,
+				DDDD00000000000000000006 /* SleepTuneWidget.entitlements */,
+			);
+			path = SleepTuneWidget;
+			sourceTree = "<group>";
+		};
 		DFC7662F721CFAFEDFD26E2F /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
@@ -553,27 +567,6 @@
 			productReference = 0E5F76E07D9EEC5B2F64A6A3 /* SleepTuneTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		EED1DA841029F662CD89CFE6 /* SleepTune */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 24444F5434A0119A2EEFB9D9 /* Build configuration list for PBXNativeTarget "SleepTune" */;
-			buildPhases = (
-				F7FCFA9523D22DE52C495BDF /* Sources */,
-				C040EEF70225EF2C49DB2203 /* Resources */,
-				C40EFD4092675D4703F478E4 /* Frameworks */,
-				DDDD0000000000000000000B /* Embed App Extensions */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				DDDD0000000000000000000F /* PBXTargetDependency */,
-			);
-			name = SleepTune;
-			packageProductDependencies = (
-			);
-			productName = SleepTune;
-			productReference = D15E97DD8536AEBB6E0F0B74 /* SleepTune.app */;
-			productType = "com.apple.product-type.application";
-		};
 		DDDD0000000000000000000D /* SleepTuneWidgetExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DDDD00000000000000000012 /* Build configuration list for PBXNativeTarget "SleepTuneWidgetExtension" */;
@@ -593,6 +586,27 @@
 			productReference = DDDD00000000000000000004 /* SleepTuneWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		EED1DA841029F662CD89CFE6 /* SleepTune */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 24444F5434A0119A2EEFB9D9 /* Build configuration list for PBXNativeTarget "SleepTune" */;
+			buildPhases = (
+				F7FCFA9523D22DE52C495BDF /* Sources */,
+				C040EEF70225EF2C49DB2203 /* Resources */,
+				C40EFD4092675D4703F478E4 /* Frameworks */,
+				DDDD0000000000000000000B /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DDDD0000000000000000000F /* PBXTargetDependency */,
+			);
+			name = SleepTune;
+			packageProductDependencies = (
+			);
+			productName = SleepTune;
+			productReference = D15E97DD8536AEBB6E0F0B74 /* SleepTune.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -600,16 +614,16 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2660;
 				TargetAttributes = {
 					32B85101CE3E807A79306BF9 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
-					EED1DA841029F662CD89CFE6 = {
+					DDDD0000000000000000000D = {
 						ProvisioningStyle = Automatic;
 					};
-					DDDD0000000000000000000D = {
+					EED1DA841029F662CD89CFE6 = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -633,20 +647,6 @@
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		DDDD0000000000000000000B /* Embed App Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				DDDD0000000000000000000C /* SleepTuneWidgetExtension.appex in Embed App Extensions */,
-			);
-			name = "Embed App Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXResourcesBuildPhase section */
 		C040EEF70225EF2C49DB2203 /* Resources */ = {
@@ -676,6 +676,14 @@
 				AAAA0009000000000000A009 /* SleepStressTests.swift in Sources */,
 				AAAA000A000000000000A00A /* SleepDebtTests.swift in Sources */,
 				AAAA000B000000000000A00B /* MetricProfilesTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DDDD00000000000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DDDD00000000000000000002 /* ScoreWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -766,14 +774,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		DDDD00000000000000000008 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				DDDD00000000000000000002 /* ScoreWidget.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -835,6 +835,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -853,6 +854,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -915,9 +917,68 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.2;
+			};
+			name = Release;
+		};
+		DDDD00000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SleepTuneWidget/SleepTuneWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = JL39GTJ62X;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SleepTuneWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SleepTune;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app.widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.2;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DDDD00000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SleepTuneWidget/SleepTuneWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = JL39GTJ62X;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = SleepTuneWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SleepTune;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app.widget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.2;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -985,69 +1046,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.2;
 			};
 			name = Debug;
-		};
-		DDDD00000000000000000010 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = SleepTuneWidget/SleepTuneWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = JL39GTJ62X;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = SleepTuneWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SleepTune;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app.widget";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 6.2;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		DDDD00000000000000000011 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = SleepTuneWidget/SleepTuneWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = JL39GTJ62X;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = SleepTuneWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SleepTune;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sleep-tune.app.widget";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 6.2;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
