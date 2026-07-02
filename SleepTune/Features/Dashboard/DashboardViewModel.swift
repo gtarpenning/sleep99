@@ -194,12 +194,19 @@ final class DashboardViewModel {
                 let totalMinutes = capturedIndicators
                     .first(where: { $0.name == "Sleep Duration" })
                     .map { Int($0.value * 60) } ?? 0
+                let window = WidgetSnapshotStore.chartWindow(
+                    heartRate: lastNightHeartRateSeries, stages: lastNightStages
+                )
                 WidgetSnapshotStore.save(WidgetSnapshot(
                     updatedAt: Date(),
                     score: capturedSummary.score,
                     sleepScore: capturedSummary.sleepScore,
                     recoveryScore: capturedSummary.recoveryScore,
-                    totalSleepMinutes: totalMinutes
+                    totalSleepMinutes: totalMinutes,
+                    stages: window.map { WidgetSnapshotStore.stageSpans(from: lastNightStages, window: $0) } ?? [],
+                    hr:  window.map { WidgetSnapshotStore.linePoints(from: lastNightHeartRateSeries, window: $0) } ?? [],
+                    hrv: window.map { WidgetSnapshotStore.linePoints(from: lastNightHRVSeries, window: $0) } ?? [],
+                    rr:  window.map { WidgetSnapshotStore.linePoints(from: lastNightRespiratoryRateSeries, window: $0) } ?? []
                 ))
             }
         }
