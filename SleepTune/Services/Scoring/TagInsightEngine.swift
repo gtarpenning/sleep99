@@ -2,6 +2,10 @@ import Foundation
 
 @MainActor
 final class TagInsightEngine {
+    /// A tag needs this many tagged nights (and as many untagged) before we
+    /// show an insight; below that the averages are mostly noise.
+    static let minTaggedNights = 10
+
     func compute(tagStore: SleepTagStore, nightStore: NightRecordStore) async -> [TagCorrelation] {
         // Up to 90 nights of history from the night store.
         let nights = (try? await nightStore.latest(90)) ?? []
@@ -29,7 +33,7 @@ final class TagInsightEngine {
             let tagged   = rows.filter { $0.tags.contains { $0.id == tagID } }
             let baseline = rows.filter { !$0.tags.contains { $0.id == tagID } }
 
-            guard tagged.count >= 2, baseline.count >= 2 else { continue }
+            guard tagged.count >= Self.minTaggedNights, baseline.count >= Self.minTaggedNights else { continue }
 
             let avgTagged   = tagged.map(\.score).reduce(0, +) / Double(tagged.count)
             let avgBaseline = baseline.map(\.score).reduce(0, +) / Double(baseline.count)
@@ -44,7 +48,7 @@ final class TagInsightEngine {
             for name in allNames {
                 let taggedVals   = tagged.compactMap   { $0.indicators.first(where: { $0.name == name })?.value }
                 let baselineVals = baseline.compactMap { $0.indicators.first(where: { $0.name == name })?.value }
-                guard taggedVals.count >= 2, baselineVals.count >= 2 else { continue }
+                guard taggedVals.count >= Self.minTaggedNights / 2, baselineVals.count >= Self.minTaggedNights / 2 else { continue }
 
                 let taggedAvg   = taggedVals.reduce(0, +) / Double(taggedVals.count)
                 let baselineAvg = baselineVals.reduce(0, +) / Double(baselineVals.count)

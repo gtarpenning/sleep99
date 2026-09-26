@@ -114,7 +114,7 @@ struct CorrelationDetailSheet: View {
                         scatter
                             .frame(height: 240)
 
-                        Text("Each dot is one night. \(finding.x.isActivity ? "\(finding.x.title) is from the day before the night" + (finding.lagNights > 0 ? " (shifted \(finding.lagNights) day\(finding.lagNights == 1 ? "" : "s"))" : "") + "." : "") Correlation is not causation; use this as a prompt to experiment, not a verdict.")
+                        Text(scatterCaption)
                             .font(.footnote)
                             .foregroundStyle(DS.textTertiary)
                     }
@@ -126,6 +126,18 @@ struct CorrelationDetailSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var scatterCaption: String {
+        var parts = ["Each dot is one night."]
+        if finding.isNextDay {
+            parts.append("\(finding.y.title) is from the day after that night.")
+        } else if finding.x.isActivity {
+            let shift = finding.lagNights > 0 ? " (shifted \(finding.lagNights) day\(finding.lagNights == 1 ? "" : "s"))" : ""
+            parts.append("\(finding.x.title) is from the day before the night\(shift).")
+        }
+        parts.append("Correlation is not causation; use this as a prompt to experiment, not a verdict.")
+        return parts.joined(separator: " ")
     }
 
     private var strengthText: String {

@@ -35,6 +35,24 @@ final class CorrelationEngineTests: XCTestCase {
         XCTAssertEqual(best?.lagNights, 2)
     }
 
+    func testNextDayDirectionUsesFollowingRecord() {
+        // Steps stored on record i describe the day before night i, i.e. the day
+        // after night i+1. Make steps track the HRV of the *previous* night.
+        let hrv = (0..<50).map { i in 30 + Double((i * 7919) % 40) }
+        let nights = (0..<50).map { i -> NightSummary in
+            let prevNightHRV = i + 1 < hrv.count ? hrv[i + 1] : 50
+            return night(i, steps: prevNightHRV * 200, hrv: hrv[i])
+        }
+        let f = CorrelationEngine.finding(x: .hrv, y: .steps, lag: -1, nights: nights)
+        XCTAssertNotNil(f)
+        XCTAssertGreaterThan(f!.r, 0.95)
+        XCTAssertTrue(f!.isNextDay)
+        XCTAssertTrue(f!.headline.hasSuffix("next day"))
+        let same = CorrelationEngine.finding(x: .hrv, y: .steps, lag: 0, nights: nights)
+        XCTAssertLessThan(abs(same?.r ?? 0), f!.r)
+        XCTAssertNotNil(CorrelationEngine.compute(nights: nights).first { $0.x == .hrv && $0.y == .steps && $0.isNextDay })
+    }
+
     func testTooFewNightsYieldsNothing() {
         let nights = (0..<10).map { i in night(i, steps: Double(i), hrv: Double(i)) }
         XCTAssertTrue(CorrelationEngine.compute(nights: nights).isEmpty)

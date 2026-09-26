@@ -6,7 +6,9 @@ struct CorrelationFinding: Identifiable, Sendable, Hashable {
 
     let x: TrendMetric
     let y: TrendMetric
-    /// Nights the activity metric leads the sleep metric by (0 = same night / previous day).
+    /// Nights the driver leads the outcome by. 0 = same record (activity is the
+    /// previous day, sleep the night). Positive = activity from N nights earlier.
+    /// −1 = sleep metric tonight → activity metric the *next* day.
     let lagNights: Int
     let r: Double
     let n: Int
@@ -18,13 +20,15 @@ struct CorrelationFinding: Identifiable, Sendable, Hashable {
         return a >= 0.5 ? .strong : a >= 0.35 ? .moderate : .weak
     }
 
-    /// "More steps → higher HRV (r = 0.41, 62 nights)"
+    var isNextDay: Bool { lagNights < 0 }
+
+    /// "Higher HRV → more steps next day"
     var headline: String {
         let dir = r > 0 ? "higher" : "lower"
-        return "Higher \(x.title) → \(dir) \(y.title)"
+        return "Higher \(x.title) → \(dir) \(y.title)\(isNextDay ? " next day" : "")"
     }
     var detail: String {
-        let lag = lagNights == 0 ? "" : ", \(lagNights + 1) days later"
+        let lag = lagNights > 0 ? ", \(lagNights + 1) days later" : ""
         return "r = \(r.formatted(.number.precision(.fractionLength(2)))) over \(n) nights\(lag)"
     }
 
@@ -39,13 +43,25 @@ enum CorrelationEngine {
     static let minAbsR = 0.25
     static let lags = [0, 1, 2]
 
-    /// (driver, outcome). Drivers are previous-day activity or a sleep metric.
+    /// (driver, outcome). Activity drivers are the previous day; sleep drivers
+    /// the night itself.
     static let pairs: [(TrendMetric, TrendMetric)] = [
+        // Day → night
         (.steps, .score), (.steps, .hrv), (.steps, .deep), (.steps, .sleepingHR),
         (.exercise, .score), (.exercise, .deep), (.exercise, .hrv), (.exercise, .sleepingHR),
-        (.peakHR, .sleepingHR), (.peakHR, .hrv),
+        (.peakHR, .score), (.peakHR, .sleepingHR), (.peakHR, .hrv), (.peakHR, .deep),
         (.vo2Max, .sleepingHR), (.vo2Max, .hrv),
+        // Night → night
         (.duration, .score), (.hrv, .score), (.sleepingHR, .score), (.respiratoryRate, .sleepingHR),
+        (.hrv, .sleepingHR), (.deep, .hrv),
+    ]
+
+    /// (sleep driver, next-day activity outcome). Evaluated at lag −1 only.
+    static let nextDayPairs: [(TrendMetric, TrendMetric)] = [
+        (.score, .steps), (.score, .exercise), (.score, .peakHR),
+        (.hrv, .steps), (.hrv, .exercise), (.hrv, .peakHR),
+        (.duration, .steps), (.duration, .exercise),
+        (.sleepingHR, .peakHR),
     ]
 
     static func compute(nights: [NightSummary]) -> [CorrelationFinding] {
@@ -59,6 +75,9 @@ enum CorrelationEngine {
             }
             if let best, abs(best.r) >= minAbsR { out.append(best) }
         }
+        for (x, y) in nextDayPairs {
+            if let f = finding(x: x, y: y, lag: -1, nights: sorted), abs(f.r) >= minAbsR { out.append(f) }
+        }
         return out.sorted { abs($0.r) > abs($1.r) }
     }
 
@@ -67,13 +86,19 @@ enum CorrelationEngine {
         let cal = Calendar.current
         var pairs: [(Double, Double)] = []
         for n in nights {
-            guard let yv = y.value(from: n) else { continue }
-            let xNight: NightSummary?
-            if lag == 0 { xNight = n } else {
+            // lag ≥ 0: outcome is this night, driver is `lag` nights earlier.
+            // lag < 0: driver is this night, outcome lives on the record |lag| nights later
+            //          (activity fields describe the day before that later night).
+            let xNight: NightSummary?, yNight: NightSummary?
+            if lag == 0 { xNight = n; yNight = n }
+            else if lag > 0 {
                 guard let d = cal.date(byAdding: .day, value: -lag, to: n.night) else { continue }
-                xNight = byKey[NightSummary.key(for: d)]
+                xNight = byKey[NightSummary.key(for: d)]; yNight = n
+            } else {
+                guard let d = cal.date(byAdding: .day, value: -lag, to: n.night) else { continue }
+                xNight = n; yNight = byKey[NightSummary.key(for: d)]
             }
-            guard let xNight, let xv = x.value(from: xNight) else { continue }
+            guard let xNight, let yNight, let xv = x.value(from: xNight), let yv = y.value(from: yNight) else { continue }
             pairs.append((xv, yv))
         }
         guard pairs.count >= minNights,
