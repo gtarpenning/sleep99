@@ -65,6 +65,20 @@ struct ScoreTrendsSectionView: View {
                 chart
                 legend
             }
+
+            NavigationLink {
+                TrendsView(viewModel: TrendsViewModel(store: viewModel.nightStore))
+            } label: {
+                HStack {
+                    Text("See all trends")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(DS.purple)
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .background(DS.surface, in: RoundedRectangle(cornerRadius: 18))

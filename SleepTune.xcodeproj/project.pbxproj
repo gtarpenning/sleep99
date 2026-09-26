@@ -106,6 +106,11 @@
 		B7F4E929DD8BA952DA412D69 /* AlcoholHeuristicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */; };
 		BA114A2097288039D15C26A0 /* AlcoholHeuristic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */; };
 		B968F2C11B3C8B830CD97656 /* AlcoholCalloutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2968F2C11B3C8B830CD9765 /* AlcoholCalloutView.swift */; };
+		B094BB23973243B678D5E5F0 /* TrendsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF094BB23973243B678D5E5F /* TrendsViewModel.swift */; };
+		B51574514BE5A2FD890DE666 /* TrendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F351574514BE5A2FD890DE66 /* TrendsView.swift */; };
+		B8BCDEB2FCD299D590600EC3 /* TrendMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8BCDEB2FCD299D590600EC /* TrendMathTests.swift */; };
+		B23C4669667A7B2319B66F78 /* TrendMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE23C4669667A7B2319B66F7 /* TrendMath.swift */; };
+		B4EE36BACF42B4C1CE483810 /* TrendMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4EE36BACF42B4C1CE48381 /* TrendMetric.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -246,6 +251,11 @@
 		F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcoholHeuristicTests.swift; sourceTree = "<group>"; };
 		FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcoholHeuristic.swift; sourceTree = "<group>"; };
 		F2968F2C11B3C8B830CD9765 /* AlcoholCalloutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcoholCalloutView.swift; sourceTree = "<group>"; };
+		FF094BB23973243B678D5E5F /* TrendsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsViewModel.swift; sourceTree = "<group>"; };
+		F351574514BE5A2FD890DE66 /* TrendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendsView.swift; sourceTree = "<group>"; };
+		FB8BCDEB2FCD299D590600EC /* TrendMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendMathTests.swift; sourceTree = "<group>"; };
+		FE23C4669667A7B2319B66F7 /* TrendMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendMath.swift; sourceTree = "<group>"; };
+		FA4EE36BACF42B4C1CE48381 /* TrendMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendMetric.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -273,6 +283,7 @@
 		A11A1A1A1A1A1A1A1A1A1A1A /* Analytics */ = {
 			isa = PBXGroup;
 			children = (
+				FE23C4669667A7B2319B66F7 /* TrendMath.swift */,
 				FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */,
 			);
 			path = Analytics;
@@ -292,6 +303,7 @@
 		131C89773AEDD6E5F2C7245C /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				FA4EE36BACF42B4C1CE48381 /* TrendMetric.swift */,
 				FC099706B1E8C3306E068A1A /* NightSummary.swift */,
 				4B7BDF3D679F7B9496309A4A /* HealthAuthorizationState.swift */,
 				B3C4D5E6F7A8B9C0D1E2F3A4 /* DailyActivitySnapshot.swift */,
@@ -397,6 +409,15 @@
 			);
 			sourceTree = "<group>";
 		};
+		A22A2A2A2A2A2A2A2A2A2A2A /* Trends */ = {
+			isa = PBXGroup;
+			children = (
+				F351574514BE5A2FD890DE66 /* TrendsView.swift */,
+				FF094BB23973243B678D5E5F /* TrendsViewModel.swift */,
+			);
+			path = Trends;
+			sourceTree = "<group>";
+		};
 		47DAE422777DC1D580F160F4 /* Features */ = {
 			isa = PBXGroup;
 			children = (
@@ -404,6 +425,7 @@
 				DFC7662F721CFAFEDFD26E2F /* Dashboard */,
 				301A33B14224C79A673369CA /* Family */,
 				28764B9B3D00218D6BF2DE73 /* Settings */,
+				A22A2A2A2A2A2A2A2A2A2A2A /* Trends */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -515,6 +537,7 @@
 		CD291F50BE4CB28EF8E5E9D9 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				FB8BCDEB2FCD299D590600EC /* TrendMathTests.swift */,
 				F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */,
 				FA8808D625669CAE071173AC /* NightRecordStoreTests.swift */,
 				F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */,
@@ -700,6 +723,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B8BCDEB2FCD299D590600EC3 /* TrendMathTests.swift in Sources */,
 				B7F4E929DD8BA952DA412D69 /* AlcoholHeuristicTests.swift in Sources */,
 				B8808D625669CAE071173ACE /* NightRecordStoreTests.swift in Sources */,
 				BC140618F07957D423C28EA2 /* ChartSnapshotTests.swift in Sources */,
@@ -722,6 +746,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B4EE36BACF42B4C1CE483810 /* TrendMetric.swift in Sources */,
+				B23C4669667A7B2319B66F78 /* TrendMath.swift in Sources */,
+				B51574514BE5A2FD890DE666 /* TrendsView.swift in Sources */,
+				B094BB23973243B678D5E5F0 /* TrendsViewModel.swift in Sources */,
 				B968F2C11B3C8B830CD97656 /* AlcoholCalloutView.swift in Sources */,
 				BA114A2097288039D15C26A0 /* AlcoholHeuristic.swift in Sources */,
 				B8BBDB68022C5636465A65CF /* HistoryBackfill.swift in Sources */,
