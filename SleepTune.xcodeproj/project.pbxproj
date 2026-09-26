@@ -97,6 +97,7 @@
 		F26A5118AC4F133D6CCC1374 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37265AD53A2FA08E7398B710 /* SettingsView.swift */; };
 		F3D918715EA14AA63C5C740C /* Charts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BDD5B56583514E3C10DC2B5 /* Charts.framework */; };
 		F69722A4DFA99DFB84104037 /* SleepTuneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC23E760633D27AE99B4CBE4 /* SleepTuneApp.swift */; };
+		BC140618F07957D423C28EA2 /* ChartSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -228,6 +229,7 @@
 		FB04AEE5F02D9F277FF72AE0 /* HealthConnectionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthConnectionRowView.swift; sourceTree = "<group>"; };
 		FBEB0AE316AF9D015ED37561 /* SleepStageSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStageSample.swift; sourceTree = "<group>"; };
 		FC23E760633D27AE99B4CBE4 /* SleepTuneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTuneApp.swift; sourceTree = "<group>"; };
+		F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSnapshotTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -484,6 +486,7 @@
 		CD291F50BE4CB28EF8E5E9D9 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */,
 				743EDC63B61B3A40FB87B8B0 /* Info.plist */,
 				4B8E63173E63ED2B36D0DF07 /* SleepScoreEngineTests.swift */,
 				BBBB0009000000000000A009 /* SleepStressTests.swift */,
@@ -665,6 +668,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC140618F07957D423C28EA2 /* ChartSnapshotTests.swift in Sources */,
 				E20F30C0BC78B8430CADF2DC /* SleepScoreEngineTests.swift in Sources */,
 				AAAA0009000000000000A009 /* SleepStressTests.swift in Sources */,
 				AAAA000A000000000000A00A /* SleepDebtTests.swift in Sources */,

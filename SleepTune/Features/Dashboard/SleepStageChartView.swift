@@ -18,8 +18,11 @@ struct SleepStageChartView: View {
             )
             .foregroundStyle(DS.stageColor(for: sample.stage))
         }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
+        .sleepChartAxes(
+            xDomain: domain,
+            yLabels: [(0.08, "000"), (0.5, "000"), (0.92, "000")],
+            visible: false
+        )
         .chartYScale(domain: yDomain())
         .chartXScale(domain: domain)
         .background(DS.surfaceHigh, in: RoundedRectangle(cornerRadius: 12))
