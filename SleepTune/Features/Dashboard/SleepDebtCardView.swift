@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Compact card summarizing the user's rolling 7-night sleep debt.
-/// Debt = hours behind an 8h target, inflated slightly by hard-training nights.
+/// Compact card summarizing recency-weighted sleep debt — hours behind the
+/// user's personal sleep need, where old shortfalls decay and surplus sleep
+/// partially repays.
 struct SleepDebtCardView: View {
     let summary: SleepDebtSummary
 
@@ -27,7 +28,7 @@ struct SleepDebtCardView: View {
                 // Supporting stats
                 HStack(spacing: 16) {
                     stat(value: String(format: "%.1f", summary.avgHours), unit: "h avg")
-                    stat(value: "\(summary.nightsAtOrAboveTarget)/\(summary.nightsCounted)", unit: "on target")
+                    stat(value: trendSymbol, unit: trendLabel)
                 }
             }
             .padding(.horizontal, 14)
@@ -50,11 +51,28 @@ struct SleepDebtCardView: View {
     }
 
     private var subtitle: String {
+        let needText = String(format: "%.1f", summary.need)
         switch summary.severity {
         case .none:     return "You're well rested"
-        case .mild:     return "Slightly behind over 7 nights"
-        case .moderate: return "Building up over 7 nights"
-        case .high:     return "Significant deficit — prioritize sleep"
+        case .mild:     return "Slightly behind your \(needText)h need"
+        case .moderate: return "Behind your \(needText)h need"
+        case .high:     return "Well behind — prioritize sleep"
+        }
+    }
+
+    private var trendSymbol: String {
+        switch summary.trend {
+        case .improving: return "↓"
+        case .steady:    return "→"
+        case .worsening: return "↑"
+        }
+    }
+
+    private var trendLabel: String {
+        switch summary.trend {
+        case .improving: return "recovering"
+        case .steady:    return "steady"
+        case .worsening: return "growing"
         }
     }
 

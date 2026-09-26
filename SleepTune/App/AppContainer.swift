@@ -20,7 +20,7 @@ extension AppContainer {
         container.dashboardViewModel.activitySnapshot = MockSleepData.activitySnapshot
         container.dashboardViewModel.tagCorrelations = MockSleepData.tagCorrelations
         container.dashboardViewModel.sleepDebt = SleepDebtSummary(
-            totalDebt: 4.5, nightsCounted: 7, avgHours: 7.4, nightsAtOrAboveTarget: 2
+            totalDebt: 2.8, nightsCounted: 10, avgHours: 7.1, need: 7.5, trend: .improving
         )
 
         // Seed mock family members so the Family tab is previewable without CloudKit.

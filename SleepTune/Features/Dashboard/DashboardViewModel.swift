@@ -463,15 +463,15 @@ final class DashboardViewModel {
         let cal = Calendar.current
         let today = Date()
         var nights: [SleepDebtNight] = []
-        for offset in 1...7 {
+        for offset in 1...SleepDebt.windowNights {
             guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
             let indicators = await localStore.loadIndicators(for: day)
             guard let duration = indicators.first(where: { $0.name == "Sleep Duration" })?.value else { continue }
-            let activity = await localStore.loadActivitySnapshot(for: day)
-            nights.append(SleepDebtNight(date: day, hours: duration, exerciseMinutes: activity?.exerciseMinutes))
+            nights.append(SleepDebtNight(date: day, hours: duration))
         }
         guard !nights.isEmpty else { return }
-        sleepDebt = SleepDebt.compute(nights: nights)
+        let need = SleepDebt.sleepNeed(from: monthlyStats["Sleep Duration"])
+        sleepDebt = SleepDebt.compute(nights: nights, need: need)
     }
 
     private func refreshTagInsights() async {
