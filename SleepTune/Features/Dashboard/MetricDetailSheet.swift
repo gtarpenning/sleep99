@@ -22,6 +22,9 @@ struct MetricDetailSheet: View {
                             rangeSection(stats: stats)
                             statsGrid(stats: stats)
                         }
+                        if let split = metric.split, split.weekday != nil, split.weekend != nil {
+                            splitSection(split: split)
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 28)
@@ -205,6 +208,50 @@ struct MetricDetailSheet: View {
                 .tracking(0.4)
                 .foregroundStyle(isTarget ? DS.purple.opacity(0.7) : DS.textTertiary)
         }
+    }
+
+    // MARK: - Weekday / weekend split
+
+    private func splitSection(split: MetricSplitStats) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Weekdays vs Weekends")
+                    .font(.caption.weight(.semibold))
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                    .foregroundStyle(DS.textTertiary)
+                Spacer()
+                Text("tonight is a \(metric.dayType == .weekend ? "weekend" : "weekday") night")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(DS.textTertiary)
+            }
+            HStack(spacing: 10) {
+                splitCell(label: "All", stats: split.all, highlighted: false)
+                splitCell(label: "Weekdays", stats: split.weekday, highlighted: metric.dayType == .weekday)
+                splitCell(label: "Weekends", stats: split.weekend, highlighted: metric.dayType == .weekend)
+            }
+            Text("Weekend nights are Friday and Saturday. Averages are over the last 30 nights.")
+                .font(.caption2)
+                .foregroundStyle(DS.textTertiary)
+        }
+    }
+
+    private func splitCell(label: String, stats: MetricStats?, highlighted: Bool) -> some View {
+        VStack(spacing: 4) {
+            Text(stats.map { formatted(value: $0.avg, unit: metric.unit, metricName: metric.name) } ?? "—")
+                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                .foregroundStyle(highlighted ? DS.purple : DS.textPrimary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(stats.map { "\(label) · \($0.count)n" } ?? label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(highlighted ? DS.purple.opacity(0.7) : DS.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(DS.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(highlighted ? DS.purple.opacity(0.5) : DS.border, lineWidth: highlighted ? 1 : 0.5))
     }
 
     // MARK: - Stats grid

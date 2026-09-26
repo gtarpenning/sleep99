@@ -93,6 +93,8 @@ struct SleepDashboardView: View {
                     MetricBreakdownView(
                         indicators: viewModel.indicators,
                         monthlyStats: viewModel.monthlyStats,
+                        splitStats: viewModel.monthlySplitStats,
+                        dayType: viewModel.selectedDayType,
                         sleepScore: viewModel.summary.sleepScore,
                         recoveryScore: viewModel.summary.recoveryScore
                     )

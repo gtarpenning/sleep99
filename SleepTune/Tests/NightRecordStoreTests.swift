@@ -77,3 +77,21 @@ final class NightRecordStoreTests: XCTestCase {
         comps.day = 25; XCTAssertEqual(DayType.classify(wakeDate: cal.date(from: comps)!), .weekday) // Fri wake = Thu night
     }
 }
+
+final class MetricSplitStatsTests: XCTestCase {
+    private func stats(_ avg: Double, count: Int = 6) -> MetricStats {
+        MetricStats(avg: avg, min: avg - 1, max: avg + 1, count: count, sortedValues: Array(repeating: avg, count: count))
+    }
+
+    func testDiffersMeaningfullyUsesEightPercentThreshold() {
+        XCTAssertFalse(MetricSplitStats(all: stats(50), weekday: stats(50), weekend: stats(53)).differsMeaningfully())
+        XCTAssertTrue(MetricSplitStats(all: stats(50), weekday: stats(50), weekend: stats(55)).differsMeaningfully())
+        XCTAssertFalse(MetricSplitStats(all: stats(50), weekday: nil, weekend: stats(70)).differsMeaningfully())
+    }
+
+    func testStatsForDayType() {
+        let split = MetricSplitStats(all: stats(1), weekday: stats(2), weekend: stats(3))
+        XCTAssertEqual(split.stats(for: .weekday)?.avg, 2)
+        XCTAssertEqual(split.stats(for: .weekend)?.avg, 3)
+    }
+}

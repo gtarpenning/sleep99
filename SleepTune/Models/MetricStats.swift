@@ -41,3 +41,34 @@ struct MetricStats: Sendable {
 
     var normalizedAvg: Double { normalizedPosition(of: avg) }
 }
+
+/// The same metric's stats split by day type. `all` is always present when
+/// the split exists; `weekday`/`weekend` are nil when too few nights.
+struct MetricSplitStats: Sendable {
+    let all: MetricStats
+    let weekday: MetricStats?
+    let weekend: MetricStats?
+
+    /// Minimum nights before a split is shown or used for scoring.
+    static let minNights = 5
+
+    func stats(for dayType: DayType) -> MetricStats? {
+        dayType == .weekend ? weekend : weekday
+    }
+
+    /// True when weekday and weekend averages differ by more than `fraction`
+    /// of the weekday average — the threshold for surfacing the split chip.
+    func differsMeaningfully(fraction: Double = 0.08) -> Bool {
+        guard let wd = weekday, let we = weekend, wd.avg != 0 else { return false }
+        return abs(we.avg - wd.avg) / abs(wd.avg) > fraction
+    }
+}
+
+enum ScoringBaselineSetting {
+    /// When set, scoring baselines use weekday nights only (if ≥ minNights).
+    static let weekdayOnlyKey = "scoring.weekdayBaseline"
+    static var weekdayOnly: Bool {
+        get { UserDefaults.standard.bool(forKey: weekdayOnlyKey) }
+        set { UserDefaults.standard.set(newValue, forKey: weekdayOnlyKey) }
+    }
+}

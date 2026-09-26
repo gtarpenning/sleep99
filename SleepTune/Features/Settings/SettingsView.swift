@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @State private var weekdayBaseline = ScoringBaselineSetting.weekdayOnly
     @Bindable var viewModel: SettingsViewModel
     @Environment(AppContainer.self) private var container
     @Environment(\.openURL) private var openURL
@@ -90,6 +91,28 @@ struct SettingsView: View {
                         .textCase(.uppercase)
                 } footer: {
                     Text("We'll remind you each morning to rate last night's sleep.")
+                        .font(.caption2)
+                        .foregroundStyle(DS.textTertiary)
+                }
+                .listRowBackground(DS.surface)
+                .listRowSeparatorTint(DS.border)
+
+                Section {
+                    Toggle("Weekday-only baseline", isOn: $weekdayBaseline)
+                        .tint(DS.purple)
+                        .foregroundStyle(DS.textPrimary)
+                        .onChange(of: weekdayBaseline) { _, newValue in
+                            ScoringBaselineSetting.weekdayOnly = newValue
+                            Task { await container.dashboardViewModel.reloadBaselines() }
+                        }
+                } header: {
+                    Text("Scoring")
+                        .font(.footnote.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(DS.textTertiary)
+                        .textCase(.uppercase)
+                } footer: {
+                    Text("Judge each night against your weekday (Sun–Thu night) averages instead of all nights, so weekends don't drag your targets down.")
                         .font(.caption2)
                         .foregroundStyle(DS.textTertiary)
                 }

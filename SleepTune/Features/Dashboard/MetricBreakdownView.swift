@@ -16,6 +16,9 @@ struct MetricContribution: Identifiable {
     let stats: MetricStats?      // 30-day stats; nil for new users
     let target: MetricTargetGuidance?
     let category: SleepIndicatorCategory
+    var split: MetricSplitStats? = nil
+    /// Day type of the night being viewed.
+    var dayType: DayType = .weekday
 
     /// Display-only contribution used in the expanded breakdown.
     /// Overall score logic remains unchanged.
@@ -28,6 +31,8 @@ struct MetricContribution: Identifiable {
 struct MetricBreakdownView: View {
     let indicators: [SleepIndicator]
     var monthlyStats: [String: MetricStats] = [:]
+    var splitStats: [String: MetricSplitStats] = [:]
+    var dayType: DayType = .weekday
     var sleepScore: Double = 0
     var recoveryScore: Double = 0
 
@@ -120,7 +125,9 @@ struct MetricBreakdownView: View {
                 hint: def?.hint,
                 stats: stats,
                 target: target,
-                category: category
+                category: category,
+                split: splitStats[indicator.name],
+                dayType: dayType
             )
         }
         // Scored metrics first (by contribution), then informational (weight 0) by name
@@ -333,9 +340,14 @@ struct MetricContributionRow: View {
             VStack(spacing: 8) {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(metric.name)
-                            .font(.subheadline)
-                            .foregroundStyle(DS.textPrimary)
+                        HStack(spacing: 6) {
+                            Text(metric.name)
+                                .font(.subheadline)
+                                .foregroundStyle(DS.textPrimary)
+                            if let split = metric.split, split.differsMeaningfully() {
+                                DayTypeChip(dayType: metric.dayType)
+                            }
+                        }
 
                         if let sub = subtitle {
                             Text(sub.text)
@@ -387,5 +399,22 @@ struct MetricContributionRow: View {
         .sheet(isPresented: $showDetail) {
             MetricDetailSheet(metric: metric)
         }
+    }
+}
+
+// MARK: - Day-type chip
+
+/// Tiny "Wd" / "We" tag shown when a metric's weekday and weekend averages
+/// differ meaningfully; tells the user which group tonight is judged against.
+struct DayTypeChip: View {
+    let dayType: DayType
+
+    var body: some View {
+        Text(dayType == .weekend ? "We" : "Wd")
+            .font(.system(size: 8, weight: .bold))
+            .foregroundStyle(dayType == .weekend ? Color(red: 1.0, green: 0.62, blue: 0.04) : DS.sleepArc)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background((dayType == .weekend ? Color(red: 1.0, green: 0.62, blue: 0.04) : DS.sleepArc).opacity(0.14), in: Capsule())
     }
 }

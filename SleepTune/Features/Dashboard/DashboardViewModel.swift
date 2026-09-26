@@ -19,6 +19,8 @@ final class DashboardViewModel {
     var scoreHistory: [SleepScoreTrendPoint]
     var trendRange: SleepScoreTrendRange
     var monthlyStats: [String: MetricStats] = [:]
+    /// Weekday / weekend split of the same 30-day window, by metric name.
+    var monthlySplitStats: [String: MetricSplitStats] = [:]
     var activityMonthlyStats: [String: MetricStats] = [:]
     var sleepDebt: SleepDebtSummary?
     /// Alcohol heuristic for the selected night; nil when nothing fired.
@@ -33,6 +35,8 @@ final class DashboardViewModel {
             result[pair.key] = effectiveBaseline(name: pair.key, stats: pair.value)
         }
     }
+
+    var selectedDayType: DayType { DayType.classify(wakeDate: selectedDate) }
 
     /// Sleep window for the selected night, derived from stage data.
     var sleepInterval: DateInterval? {
@@ -523,12 +527,35 @@ final class DashboardViewModel {
 
     private func loadMonthlyStats() async {
         let nights = await recentNights(days: 30, before: Date())
-        var byName: [String: [Double]] = [:]
+        var all: [String: [Double]] = [:]
+        var weekday: [String: [Double]] = [:]
+        var weekend: [String: [Double]] = [:]
         for n in nights {
-            for (name, value) in n.metrics { byName[name, default: []].append(value) }
+            for (name, value) in n.metrics {
+                all[name, default: []].append(value)
+                if n.dayType == .weekend { weekend[name, default: []].append(value) }
+                else { weekday[name, default: []].append(value) }
+            }
         }
-        let stats = byName.compactMapValues(Self.stats(from:))
-        if !stats.isEmpty || !nights.isEmpty { monthlyStats = stats }
+        var split: [String: MetricSplitStats] = [:]
+        for (name, values) in all {
+            guard let a = Self.stats(from: values) else { continue }
+            let wd = (weekday[name] ?? []).count >= MetricSplitStats.minNights ? Self.stats(from: weekday[name] ?? []) : nil
+            let we = (weekend[name] ?? []).count >= MetricSplitStats.minNights ? Self.stats(from: weekend[name] ?? []) : nil
+            split[name] = MetricSplitStats(all: a, weekday: wd, weekend: we)
+        }
+        guard !nights.isEmpty else { return }
+        monthlySplitStats = split
+        // Scoring baseline: all nights, or weekday-only when the user opted in
+        // (falls back per metric when there aren't enough weekday nights).
+        let weekdayOnly = ScoringBaselineSetting.weekdayOnly
+        monthlyStats = split.mapValues { weekdayOnly ? ($0.weekday ?? $0.all) : $0.all }
+    }
+
+    /// Called when the scoring-baseline setting changes.
+    func reloadBaselines() async {
+        await loadMonthlyStats()
+        recalculateScore()
     }
 
     private func loadActivityMonthlyStats() async {
