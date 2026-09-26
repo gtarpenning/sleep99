@@ -44,14 +44,6 @@ enum MetricRegistry {
               weight: 0.05, lowerIsBetter: true,
               hint: "0 = perfect · each long waking hurts"),
 
-        // Proxy for sleep-disordered breathing. Score is absolute (0 always perfect)
-        // so we don't use personal monthly average as the target here.
-        .init(name: "Apnea Events",
-              category: .sleepArchitecture,
-              scoring: .lowerIsBetter(idealMax: 0, hardMax: 5),    // 0 = perfect, 5+ = 0
-              weight: 0.08, lowerIsBetter: true,
-              hint: "0 = perfect · fewer events is better"),
-
         // Average HR during sleep scores in BOTH categories (see recovery entry below).
         // Physiologically it reflects sleep quality (arousal, stress) AND cardiovascular recovery.
         .init(name: "Overnight Heart Rate",

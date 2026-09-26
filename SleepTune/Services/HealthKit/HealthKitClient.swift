@@ -790,39 +790,6 @@ private extension HealthKitClient {
             ))
         }
 
-        // Apnea Events — uses the shared ApneaDetector, which flags points
-        // ≥ max(mean + 2σ, mean + 3 br/min) above the nightly RR baseline and
-        // clusters nearby spikes into a single event. This is more sensitive
-        // than the previous fixed 25% multiplier and adapts per-user.
-        let apneaEvents: Int? = await {
-            guard let type = HKObjectType.quantityType(forIdentifier: .respiratoryRate) else { return nil }
-            let rrUnit = HKUnit.count().unitDivided(by: .minute())
-            let rrSamples: [HKQuantitySample] = (try? await fetchSamples(
-                type: type,
-                predicate: hrPredicate,
-                limit: HKObjectQueryNoLimit,
-                sort: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
-            )) ?? []
-            guard rrSamples.count >= 10 else { return nil }
-            let points = rrSamples.map {
-                SleepChartPoint(date: $0.startDate, value: $0.quantity.doubleValue(for: rrUnit))
-            }
-            let events = ApneaDetector.detect(in: points)
-            return events.isEmpty ? nil : events.count
-        }()
-
-        if let events = apneaEvents {
-            indicators.append(SleepIndicator(
-                name: "Apnea Events",
-                detail: "RR spikes ≥ 2σ above nightly baseline",
-                value: Double(events),
-                unit: "events",
-                category: .sleepArchitecture,
-                source: .appleWatch,
-                range: 0...10
-            ))
-        }
-
         if let value = await oxygen {
             indicators.append(SleepIndicator(
                 name: "Blood Oxygen",

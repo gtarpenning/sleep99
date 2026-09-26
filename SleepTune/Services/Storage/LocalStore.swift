@@ -48,7 +48,7 @@ final class MockSleepStore: SleepLocalStore {
 final class UserDefaultsSleepStore: SleepLocalStore {
     // Bump this when the indicator schema changes (names, units, added/removed fields).
     // Old indicator cache is automatically cleared on next launch.
-    private static let currentSchemaVersion = 6
+    private static let currentSchemaVersion = 7
     private let schemaVersionKey = "indicatorSchemaVersion"
 
     private let defaults = UserDefaults.standard

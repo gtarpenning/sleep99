@@ -91,8 +91,7 @@ enum MockSleepData {
         let rawValues: [(Double, Double)] = [
             (18,15),(30,14),(50,13),(70,13),(90,12),(110,13),(130,14),
             (150,15),(165,13),(185,12),(205,12),
-            // Apnea event ~t=215–232: brief cessation followed by gasping recovery spike
-            (215,10),(220,19),(225,23),(232,18),
+            (215,13),(220,14),(225,14),(232,13),
             (245,14),
             (265,15),(285,14),(305,13),(325,14),(345,15),(365,16),
             (383,14),(400,13),(415,14),(435,15)
@@ -100,7 +99,7 @@ enum MockSleepData {
         let points = rawValues.map { SleepChartPoint(date: t($0.0), value: $0.1) }
         return SleepChartSeries(title: "Respiratory Rate", unit: "br/min", points: points)
     }()
-    // Avg ≈ 14 br/min; apnea spike peaks at ~23 br/min around t=225 (deep sleep period)
+    // Avg ≈ 14 br/min
 
     // MARK: - SleepSignalSamples (for HealthKitClient mock)
 
