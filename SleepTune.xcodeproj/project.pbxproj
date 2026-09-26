@@ -111,6 +111,9 @@
 		B8BCDEB2FCD299D590600EC3 /* TrendMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8BCDEB2FCD299D590600EC /* TrendMathTests.swift */; };
 		B23C4669667A7B2319B66F78 /* TrendMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE23C4669667A7B2319B66F7 /* TrendMath.swift */; };
 		B4EE36BACF42B4C1CE483810 /* TrendMetric.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA4EE36BACF42B4C1CE48381 /* TrendMetric.swift */; };
+		BBF1A66C1A890261A528B2FE /* CorrelationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBF1A66C1A890261A528B2F /* CorrelationEngine.swift */; };
+		BF180EF157A9FEB18A054261 /* CorrelationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEF180EF157A9FEB18A05426 /* CorrelationEngineTests.swift */; };
+		B5A13C2BBF078A720A1F9CC1 /* CorrelationsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5A13C2BBF078A720A1F9CC /* CorrelationsCardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -256,6 +259,9 @@
 		FB8BCDEB2FCD299D590600EC /* TrendMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendMathTests.swift; sourceTree = "<group>"; };
 		FE23C4669667A7B2319B66F7 /* TrendMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendMath.swift; sourceTree = "<group>"; };
 		FA4EE36BACF42B4C1CE48381 /* TrendMetric.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendMetric.swift; sourceTree = "<group>"; };
+		FEBF1A66C1A890261A528B2F /* CorrelationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngine.swift; sourceTree = "<group>"; };
+		FEF180EF157A9FEB18A05426 /* CorrelationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationEngineTests.swift; sourceTree = "<group>"; };
+		FB5A13C2BBF078A720A1F9CC /* CorrelationsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationsCardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -283,6 +289,7 @@
 		A11A1A1A1A1A1A1A1A1A1A1A /* Analytics */ = {
 			isa = PBXGroup;
 			children = (
+				FEBF1A66C1A890261A528B2F /* CorrelationEngine.swift */,
 				FE23C4669667A7B2319B66F7 /* TrendMath.swift */,
 				FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */,
 			);
@@ -412,6 +419,7 @@
 		A22A2A2A2A2A2A2A2A2A2A2A /* Trends */ = {
 			isa = PBXGroup;
 			children = (
+				FB5A13C2BBF078A720A1F9CC /* CorrelationsCardView.swift */,
 				F351574514BE5A2FD890DE66 /* TrendsView.swift */,
 				FF094BB23973243B678D5E5F /* TrendsViewModel.swift */,
 			);
@@ -537,6 +545,7 @@
 		CD291F50BE4CB28EF8E5E9D9 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				FEF180EF157A9FEB18A05426 /* CorrelationEngineTests.swift */,
 				FB8BCDEB2FCD299D590600EC /* TrendMathTests.swift */,
 				F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */,
 				FA8808D625669CAE071173AC /* NightRecordStoreTests.swift */,
@@ -723,6 +732,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF180EF157A9FEB18A054261 /* CorrelationEngineTests.swift in Sources */,
 				B8BCDEB2FCD299D590600EC3 /* TrendMathTests.swift in Sources */,
 				B7F4E929DD8BA952DA412D69 /* AlcoholHeuristicTests.swift in Sources */,
 				B8808D625669CAE071173ACE /* NightRecordStoreTests.swift in Sources */,
@@ -746,6 +756,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B5A13C2BBF078A720A1F9CC1 /* CorrelationsCardView.swift in Sources */,
+				BBF1A66C1A890261A528B2FE /* CorrelationEngine.swift in Sources */,
 				B4EE36BACF42B4C1CE483810 /* TrendMetric.swift in Sources */,
 				B23C4669667A7B2319B66F78 /* TrendMath.swift in Sources */,
 				B51574514BE5A2FD890DE666 /* TrendsView.swift in Sources */,

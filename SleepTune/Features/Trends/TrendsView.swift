@@ -16,6 +16,9 @@ struct TrendsView: View {
                     metricChips
                     chartCard
                     dayOfWeekCard
+                    CorrelationsCardView(findings: viewModel.correlations,
+                                         fitnessSentence: viewModel.fitnessSentence,
+                                         nightCount: viewModel.correlationNights)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)

@@ -41,6 +41,12 @@ final class ChartSnapshotTests: XCTestCase {
         try Self.write(dow, name: "dow", width: 358)
     }
 
+    func testRenderCorrelationsCard() throws {
+        let nights = MockSleepData.nightSummaries(count: 90)
+        let f = CorrelationEngine.compute(nights: nights)
+        try Self.write(CorrelationsCardView(findings: f, fitnessSentence: CorrelationEngine.fitnessSentence(nights: nights), nightCount: nights.count), name: "corrcard", width: 358)
+    }
+
     static func write<V: View>(_ view: V, name: String, width: CGFloat) throws {
         let wrapped = view
             .frame(width: width)

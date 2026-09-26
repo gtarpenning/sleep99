@@ -23,6 +23,9 @@ final class TrendsViewModel {
     private(set) var compareAverage: Double?
     private(set) var weekdayScores: [Int: (avg: Double, n: Int)] = [:]
     private(set) var trendSentence: String?
+    private(set) var correlations: [CorrelationFinding] = []
+    private(set) var fitnessSentence: String?
+    private(set) var correlationNights = 0
 
     private let store: NightRecordStore
     private static let prefsKey = "trends.prefs"
@@ -41,6 +44,10 @@ final class TrendsViewModel {
         let all = (try? await store.latest(400)) ?? []
         nights = all
         rebuild()
+        let recent = Array(all.suffix(90))
+        correlationNights = recent.count
+        correlations = CorrelationEngine.compute(nights: recent)
+        fitnessSentence = CorrelationEngine.fitnessSentence(nights: recent)
     }
 
     // MARK: - Series
