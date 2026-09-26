@@ -1,137 +1,91 @@
 import Charts
 import SwiftUI
 
-// MARK: - Chart series identifier
-
-private enum TrendSeries: String, Plottable {
-    case sleep    = "Sleep"
-    case recovery = "Recovery"
-
-    var color: Color {
-        switch self {
-        case .sleep:    return DS.sleepArc
-        case .recovery: return DS.recoveryArc
-        }
-    }
-
-    var lineWidth: CGFloat { 2.0 }
-}
-
-// MARK: - Flat row for Swift Charts
-
-private struct TrendRow: Identifiable {
-    let id = UUID()
-    let date: Date
-    let score: Double
-    let series: TrendSeries
-}
-
-// MARK: - View
-
+/// Compact trend row: a 7-night score sparkline that opens the Trends screen.
+/// Ranges, overlays and legends live there, not on the dashboard.
 struct ScoreTrendsSectionView: View {
     @Bindable var viewModel: DashboardViewModel
 
-    private var rows: [TrendRow] {
-        viewModel.scoreHistory.flatMap { point -> [TrendRow] in
-            var out: [TrendRow] = []
-            if let s = point.sleepScore    { out.append(TrendRow(date: point.date, score: s, series: .sleep)) }
-            if let r = point.recoveryScore { out.append(TrendRow(date: point.date, score: r, series: .recovery)) }
-            return out
-        }
+    private var points: [SleepScoreTrendPoint] {
+        Array(viewModel.scoreHistory.filter { $0.score > 0 }.sorted { $0.date < $1.date }.suffix(7))
+    }
+
+    private var delta: Double? {
+        guard points.count >= 4, let last = points.last else { return nil }
+        let prior = points.dropLast()
+        return last.score - prior.map(\.score).reduce(0, +) / Double(prior.count)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            DSSectionHeader(title: "Trend")
-
-            Picker("Range", selection: $viewModel.trendRange) {
-                ForEach(SleepScoreTrendRange.allCases) { range in
-                    Text(range.title).tag(range)
-                }
-            }
-            .pickerStyle(.segmented)
-            .colorScheme(.dark)
-            .onChange(of: viewModel.trendRange) { _, _ in
-                viewModel.updateTrendRange(viewModel.trendRange)
-            }
-
-            if viewModel.scoreHistory.isEmpty {
-                Text("Scores will appear here as you sync data.")
-                    .font(.subheadline)
-                    .foregroundStyle(DS.textTertiary)
-                    .frame(height: 120, alignment: .center)
-                    .frame(maxWidth: .infinity)
-            } else {
-                chart
-                legend
-            }
-
-            NavigationLink {
-                TrendsView(viewModel: TrendsViewModel(store: viewModel.nightStore))
-            } label: {
-                HStack {
-                    Text("See all trends")
+        NavigationLink {
+            TrendsView(viewModel: TrendsViewModel(store: viewModel.nightStore))
+        } label: {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Trend")
                         .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                }
-                .foregroundStyle(DS.purple)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(16)
-        .background(DS.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(DS.border, lineWidth: 0.5))
-    }
-
-    // MARK: - Chart
-
-    private var chart: some View {
-        Chart(rows) { row in
-            LineMark(
-                x: .value("Date", row.date),
-                y: .value("Score", row.score),
-                series: .value("Series", row.series.rawValue)
-            )
-            .interpolationMethod(.catmullRom)
-            .foregroundStyle(row.series.color)
-            .lineStyle(StrokeStyle(lineWidth: row.series.lineWidth))
-
-        }
-        .chartYScale(domain: 0...100)
-        .chartXAxis(.hidden)
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: [0, 50, 100]) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
-                    .foregroundStyle(DS.border)
-                AxisValueLabel {
-                    if let v = value.as(Int.self) {
-                        Text("\(v)")
-                            .font(.caption2)
-                            .foregroundStyle(DS.textTertiary)
-                    }
-                }
-            }
-        }
-        .chartLegend(.hidden)
-        .frame(height: 130)
-    }
-
-    // MARK: - Legend
-
-    private var legend: some View {
-        HStack(spacing: 16) {
-            ForEach([TrendSeries.sleep, .recovery], id: \.self) { series in
-                HStack(spacing: 5) {
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(series.color)
-                        .frame(width: 16, height: 2)
-                    Text(series.rawValue)
-                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(DS.textPrimary)
+                    Text(subtitle)
+                        .font(.caption)
                         .foregroundStyle(DS.textSecondary)
                 }
+
+                if points.count >= 2 {
+                    TrendSparkline(points: points)
+                        .frame(height: 34)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 3) {
+                    Text("All")
+                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(DS.purple)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background(DS.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(DS.border, lineWidth: 0.5))
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Trend, \(subtitle). Opens all trends.")
+    }
+
+    private var subtitle: String {
+        guard points.count >= 2 else { return "Scores appear as you sync" }
+        guard let delta else { return "\(points.count)-night score" }
+        let d = Int(delta.rounded())
+        if d == 0 { return "\(points.count)-night score · steady" }
+        return "\(points.count)-night score · \(d > 0 ? "+" : "")\(d) vs avg"
+    }
+}
+
+struct TrendSparkline: View {
+    let points: [SleepScoreTrendPoint]
+
+    var body: some View {
+        let lo = (points.map(\.score).min() ?? 0) - 6
+        let hi = (points.map(\.score).max() ?? 100) + 6
+        Chart {
+            ForEach(points) { p in
+                LineMark(x: .value("Date", p.date), y: .value("Score", p.score))
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(DS.sleepArc)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+            if let last = points.last {
+                PointMark(x: .value("Date", last.date), y: .value("Score", last.score))
+                    .foregroundStyle(DS.sleepArc)
+                    .symbolSize(36)
             }
         }
+        .chartYScale(domain: lo...hi)
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartLegend(.hidden)
     }
 }

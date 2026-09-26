@@ -47,6 +47,36 @@ final class ChartSnapshotTests: XCTestCase {
         try Self.write(CorrelationsCardView(findings: f, fitnessSentence: CorrelationEngine.fitnessSentence(nights: nights), nightCount: nights.count), name: "corrcard", width: 358)
     }
 
+    func testRenderStreamlinedPieces() throws {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let snap = DailyActivitySnapshot(
+            date: cal.date(byAdding: .day, value: -1, to: today)!,
+            steps: 9412, activeCalories: 612, exerciseMinutes: 46, standMinutes: 660,
+            floorsClimbed: 14, peakHR: 162, vo2Max: 44.1, workouts: []
+        )
+        let stats: [String: MetricStats] = [
+            "steps": MetricStats(avg: 8100, min: 2000, max: 15000, count: 30),
+            "ex": MetricStats(avg: 52, min: 0, max: 120, count: 30),
+            "peakhr": MetricStats(avg: 160, min: 120, max: 182, count: 30),
+        ]
+        try Self.write(
+            InsightsBlockView(tagCorrelations: [], activitySnapshot: snap, activityMonthlyStats: stats, selectedDate: today),
+            name: "activitystrip", width: 393)
+
+        let scores: [Double] = [72, 78, 65, 81, 84, 77, 81]
+        let pts = scores.enumerated().map { i, s in
+            SleepScoreTrendPoint(date: cal.date(byAdding: .day, value: i - 6, to: today)!, score: s, sleepScore: s, recoveryScore: s)
+        }
+        try Self.write(TrendSparkline(points: pts).frame(height: 34), name: "sparkline", width: 200)
+
+        let card = BreakdownCard(title: "Sleep", iconName: "moon.fill", score: 81, accentColor: DS.sleepArc,
+                                 metrics: [CardMetric(name: "Duration", value: "6h 31m", source: .appleHealth),
+                                           CardMetric(name: "REM Sleep", value: "115m", source: .appleHealth)],
+                                 showsDisclosure: true)
+        try Self.write(card, name: "breakdowncard", width: 180)
+    }
+
     static func write<V: View>(_ view: V, name: String, width: CGFloat) throws {
         let wrapped = view
             .frame(width: width)

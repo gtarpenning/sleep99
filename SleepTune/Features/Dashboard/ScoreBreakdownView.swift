@@ -3,30 +3,33 @@ import SwiftUI
 struct ScoreBreakdownView: View {
     let summary: SleepScoreSummary
     let indicators: [SleepIndicator]
+    /// When set, each card is a button that opens the full breakdown for its category.
+    var onSelect: ((SleepIndicatorCategory) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
-            BreakdownCard(
-                title: "Sleep",
-                iconName: "moon.fill",
-                score: summary.sleepScore,
-                accentColor: DS.sleepArc,
-                metrics: metrics(for: .sleepArchitecture)
-            )
-            .frame(maxWidth: .infinity)
-
-            BreakdownCard(
-                title: "Recovery",
-                iconName: "heart.fill",
-                score: summary.recoveryScore,
-                accentColor: DS.recoveryArc,
-                metrics: metrics(for: .recovery)
-            )
-            .frame(maxWidth: .infinity)
+            card(.sleepArchitecture, title: "Sleep", icon: "moon.fill", score: summary.sleepScore, color: DS.sleepArc)
+            card(.recovery, title: "Recovery", icon: "heart.fill", score: summary.recoveryScore, color: DS.recoveryArc)
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: 520)
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func card(_ category: SleepIndicatorCategory, title: String, icon: String, score: Double, color: Color) -> some View {
+        let content = BreakdownCard(
+            title: title, iconName: icon, score: score, accentColor: color,
+            metrics: metrics(for: category), showsDisclosure: onSelect != nil
+        )
+        .frame(maxWidth: .infinity)
+        if let onSelect {
+            Button { onSelect(category) } label: { content.contentShape(.rect) }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows the full \(title.lowercased()) score breakdown")
+        } else {
+            content
+        }
     }
 
     // Top-N metrics per card, ordered by registry weight descending (tiebreak: name).
@@ -97,6 +100,7 @@ struct BreakdownCard: View {
     let score: Double
     let accentColor: Color
     let metrics: [CardMetric]
+    var showsDisclosure = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -149,6 +153,15 @@ struct BreakdownCard: View {
                 }
             }
 
+            if showsDisclosure {
+                HStack(spacing: 3) {
+                    Spacer(minLength: 0)
+                    Text("Breakdown")
+                    Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold))
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(DS.textTertiary)
+            }
         }
         .padding(14)
         .background(DS.surface, in: RoundedRectangle(cornerRadius: 16))

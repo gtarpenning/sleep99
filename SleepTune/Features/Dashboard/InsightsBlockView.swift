@@ -8,7 +8,6 @@ struct InsightsBlockView: View {
     let activityMonthlyStats: [String: MetricStats]
     let selectedDate: Date
 
-    @State private var activityExpanded = false
     @State private var selectedCorrelation: TagCorrelation?
     @State private var selectedActivityMetric: ActivityMetricItem?
 
@@ -22,7 +21,7 @@ struct InsightsBlockView: View {
                 if !tagCorrelations.isEmpty {
                     tagInsightsSection
                 }
-                if activitySnapshot != nil {
+                if !stripItems.isEmpty {
                     activitySection
                 }
             }
@@ -57,49 +56,33 @@ struct InsightsBlockView: View {
 
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            DSSectionHeader(title: "Activity  ·  \(activityDateLabel)")
+            DSSectionHeader(title: activityDateLabel)
                 .padding(.horizontal, 20)
 
-            let items = activityItems(expanded: activityExpanded)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach(items) { item in
-                    ActivityChip(item: item)
-                        .onTapGesture { selectedActivityMetric = item }
+            HStack(spacing: 8) {
+                ForEach(stripItems) { item in
+                    Button { selectedActivityMetric = item } label: {
+                        ActivityStripChip(item: item, average: activityMonthlyStats[item.id]?.avg)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 20)
-            .animation(.spring(duration: 0.3), value: activityExpanded)
-
-            if activityHasMoreItems {
-                Button {
-                    withAnimation(.spring(duration: 0.3)) { activityExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(activityExpanded ? "Show less" : "Show more")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(DS.textTertiary)
-                        Image(systemName: activityExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(DS.textTertiary)
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .buttonStyle(.plain)
-            }
         }
+    }
+
+    /// The three numbers worth a glance; everything else lives on the Trends screen.
+    private var stripItems: [ActivityMetricItem] {
+        let wanted = ["steps", "ex", "peakhr"]
+        let all = activityItems(expanded: true)
+        return wanted.compactMap { id in all.first { $0.id == id } }
     }
 
     private var activityDateLabel: String {
         let activityDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
         if Calendar.current.isDateInYesterday(activityDate) { return "Yesterday" }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MMM d"
-        return fmt.string(from: activityDate)
-    }
-
-    private var activityHasMoreItems: Bool {
-        guard let snap = activitySnapshot else { return false }
-        return snap.floorsClimbed != nil || snap.standMinutes != nil || snap.vo2Max != nil || !snap.workouts.isEmpty
+        return "Day before · " + activityDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
     }
 
     private func activityItems(expanded: Bool) -> [ActivityMetricItem] {
@@ -216,29 +199,74 @@ private struct TagInsightRow: View {
     }
 }
 
-// MARK: - ActivityChip
+// MARK: - ActivityStripChip
 
-private struct ActivityChip: View {
+/// Label, value, and an arrow against the 30-day average.
+private struct ActivityStripChip: View {
     let item: ActivityMetricItem
+    let average: Double?
+
+    private enum Direction { case up, down, flat }
+
+    private var direction: Direction? {
+        guard let average, average > 0 else { return nil }
+        let rel = (item.value - average) / average
+        if rel > 0.05 { return .up }
+        if rel < -0.05 { return .down }
+        return .flat
+    }
+
+    private var averageText: String? {
+        guard let average, average > 0 else { return nil }
+        let avgItem = ActivityMetricItem(id: item.id, label: item.label, value: average, unit: item.unit, icon: item.icon)
+        return "avg \(avgItem.formattedValue)"
+    }
 
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: item.icon)
-                .font(.system(size: 13, weight: .semibold))
+        VStack(alignment: .leading, spacing: 3) {
+            Text(item.label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .kerning(0.6)
                 .foregroundStyle(DS.textSecondary)
-            Text(item.formattedValue)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(DS.textPrimary)
-                .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(item.label)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(DS.textTertiary)
-                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(item.formattedValue)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(DS.textPrimary)
+                    .monospacedDigit()
+                if item.unit == "min" || item.unit == "bpm" {
+                    Text(item.unit)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(DS.textTertiary)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            HStack(spacing: 4) {
+                if let direction {
+                    Image(systemName: symbol(direction))
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundStyle(color(direction))
+                }
+                Text(averageText ?? "no average yet")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(DS.textTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .dsCard(12)
+        .dsCard(14)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func symbol(_ d: Direction) -> String {
+        switch d { case .up: return "arrowtriangle.up.fill"; case .down: return "arrowtriangle.down.fill"; case .flat: return "minus" }
+    }
+    // Direction is descriptive, not a verdict: more activity is green, less is muted.
+    private func color(_ d: Direction) -> Color {
+        switch d { case .up: return DS.green; case .down: return DS.textSecondary; case .flat: return DS.textTertiary }
     }
 }

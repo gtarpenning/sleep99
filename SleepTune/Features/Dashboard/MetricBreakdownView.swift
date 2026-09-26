@@ -39,7 +39,20 @@ struct MetricBreakdownView: View {
     // Category splits from default weights (architecture 40%, recovery 60%)
     private let weights = SleepScoreWeights.default
 
-    @State private var expandedCategory: SleepIndicatorCategory? = nil
+    @State private var expandedCategory: SleepIndicatorCategory?
+
+    init(indicators: [SleepIndicator], monthlyStats: [String: MetricStats] = [:],
+         splitStats: [String: MetricSplitStats] = [:], dayType: DayType = .weekday,
+         sleepScore: Double = 0, recoveryScore: Double = 0,
+         initialCategory: SleepIndicatorCategory? = nil) {
+        self.indicators = indicators
+        self.monthlyStats = monthlyStats
+        self.splitStats = splitStats
+        self.dayType = dayType
+        self.sleepScore = sleepScore
+        self.recoveryScore = recoveryScore
+        _expandedCategory = State(initialValue: initialCategory)
+    }
 
     var body: some View {
         VStack(spacing: 10) {

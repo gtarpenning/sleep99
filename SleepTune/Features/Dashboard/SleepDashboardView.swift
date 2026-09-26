@@ -9,11 +9,54 @@ import SwiftUI
 }
 #endif
 
+/// Which score card was tapped; drives the breakdown sheet.
+struct BreakdownSelection: Identifiable {
+    let category: SleepIndicatorCategory
+    var id: String { "\(category)" }
+}
+
+/// Full per-metric score breakdown, opened from the Sleep / Recovery cards.
+struct ScoreBreakdownSheet: View {
+    let indicators: [SleepIndicator]
+    let monthlyStats: [String: MetricStats]
+    let splitStats: [String: MetricSplitStats]
+    let dayType: DayType
+    let sleepScore: Double
+    let recoveryScore: Double
+    let initialCategory: SleepIndicatorCategory
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                MetricBreakdownView(
+                    indicators: indicators, monthlyStats: monthlyStats, splitStats: splitStats,
+                    dayType: dayType, sleepScore: sleepScore, recoveryScore: recoveryScore,
+                    initialCategory: initialCategory
+                )
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+            }
+            .scrollIndicators(.hidden)
+            .background(DS.bg)
+            .navigationTitle("Score Breakdown")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.fraction(0.9), .large])
+        .presentationBackground(DS.bg)
+        .presentationCornerRadius(28)
+        .preferredColorScheme(.dark)
+    }
+}
+
 struct SleepDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     @Environment(AppContainer.self) private var container
     @Environment(\.openURL) private var openURL
     @State private var showsAlcoholSheet = false
+    @State private var breakdownCategory: BreakdownSelection?
 
     var body: some View {
         NavigationStack {
@@ -80,25 +123,13 @@ struct SleepDashboardView: View {
                 // Breakdown cards
                 ScoreBreakdownView(
                     summary: viewModel.summary,
-                    indicators: viewModel.indicators
+                    indicators: viewModel.indicators,
+                    onSelect: viewModel.indicators.isEmpty ? nil : { breakdownCategory = BreakdownSelection(category: $0) }
                 )
 
                 // Rolling sleep debt (7-night)
                 if let debt = viewModel.sleepDebt {
                     SleepDebtCardView(summary: debt)
-                }
-
-                // Full metric breakdown (expandable)
-                if !viewModel.indicators.isEmpty {
-                    MetricBreakdownView(
-                        indicators: viewModel.indicators,
-                        monthlyStats: viewModel.monthlyStats,
-                        splitStats: viewModel.monthlySplitStats,
-                        dayType: viewModel.selectedDayType,
-                        sleepScore: viewModel.summary.sleepScore,
-                        recoveryScore: viewModel.summary.recoveryScore
-                    )
-                    .padding(.horizontal, 20)
                 }
 
                 // Sleep stages chart
@@ -116,7 +147,7 @@ struct SleepDashboardView: View {
                     }
                 }
 
-                // Insights (tag correlations + activity)
+                // Tag insights + yesterday's activity strip
                 InsightsBlockView(
                     tagCorrelations: viewModel.tagCorrelations,
                     activitySnapshot: viewModel.activitySnapshot,
@@ -144,6 +175,17 @@ struct SleepDashboardView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .sheet(item: $breakdownCategory) { selection in
+            ScoreBreakdownSheet(
+                indicators: viewModel.indicators,
+                monthlyStats: viewModel.monthlyStats,
+                splitStats: viewModel.monthlySplitStats,
+                dayType: viewModel.selectedDayType,
+                sleepScore: viewModel.summary.sleepScore,
+                recoveryScore: viewModel.summary.recoveryScore,
+                initialCategory: selection.category
+            )
+        }
         .sheet(isPresented: $showsAlcoholSheet) {
             if let result = viewModel.alcoholResult {
                 AlcoholDetailSheet(
