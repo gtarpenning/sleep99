@@ -14,7 +14,8 @@ concurrency:
 jobs:
   build:
     name: Compile
-    runs-on: self-hosted
+    # PRs (possibly from forks) never touch the self-hosted Mac.
+    runs-on: ${{ github.event_name == 'pull_request' && 'macos-15' || 'self-hosted' }}
     timeout-minutes: 20
 
     steps:
@@ -22,6 +23,10 @@ jobs:
         run: git config --global credential.helper ""
 
       - uses: actions/checkout@v4
+
+      - name: Install xcbeautify (hosted runner only)
+        if: github.event_name == 'pull_request'
+        run: brew install xcbeautify
 
       - name: Compile (no signing)
         run: |
