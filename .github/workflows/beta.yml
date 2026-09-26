@@ -45,12 +45,17 @@ jobs:
           gem install bundler --no-document 2>/dev/null || true
           bundle install --jobs 4 --retry 3
 
-      - name: Keychain search list
-        # Self-hosted runner: the dist cert + key live in the login keychain.
-        # Never replace the default keychain here; that drops login from the
-        # search list and codesign can no longer find the private key.
+      - name: Build keychain
+        # Self-hosted runner. Sign from a dedicated keychain whose password we
+        # know, so match can grant codesign key access without a GUI prompt
+        # (signing from the login keychain fails with errSecInternalComponent).
+        # Only this keychain is searched during the job; restored below.
         run: |
-          security list-keychains -d user -s ~/Library/Keychains/login.keychain-db
+          KC=~/Library/Keychains/build.keychain-db
+          security create-keychain -p "" build.keychain 2>/dev/null || true
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security list-keychains -d user -s "$KC"
           security default-keychain -s ~/Library/Keychains/login.keychain-db
 
       - name: Configure git credentials
@@ -65,6 +70,8 @@ jobs:
           ASC_ISSUER_ID:    ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT:  ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_PASSWORD:   ${{ secrets.MATCH_PASSWORD }}
+          MATCH_KEYCHAIN_NAME: build.keychain
+          MATCH_KEYCHAIN_PASSWORD: ""
           MATCH_GIT_URL:    git@github.com:gtarpenning/sleep-tune-certs.git
           RELEASE_NOTES:    ${{ github.event.inputs.release_notes || format('commit {0}', github.sha) }}
           GIT_AUTHOR_NAME:     "ci-bot"
@@ -74,6 +81,12 @@ jobs:
         run: |
           export PATH="/opt/homebrew/opt/ruby@3.3/bin:/opt/homebrew/bin:$PATH"
           bundle exec fastlane beta
+
+      - name: Restore keychain search list
+        if: always()
+        run: |
+          security list-keychains -d user -s ~/Library/Keychains/login.keychain-db ~/Library/Keychains/build.keychain-db
+          security default-keychain -s ~/Library/Keychains/login.keychain-db
 
       - name: Upload IPA (debug artifact)
         if: always()

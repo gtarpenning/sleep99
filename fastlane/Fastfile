@@ -3,6 +3,7 @@ default_platform(:ios)
 platform :ios do
 
   desc "Build and upload to TestFlight"
+  # CI sets MATCH_KEYCHAIN_NAME=build.keychain and MATCH_KEYCHAIN_PASSWORD="".
   lane :beta do
     api_key = app_store_connect_api_key(
       key_id:               ENV["ASC_KEY_ID"],
@@ -14,9 +15,11 @@ platform :ios do
 
     # Profiles + dist cert for the app and the widget extension (see Matchfile).
     match(
-      type:     "appstore",
-      readonly: true,
-      api_key:  api_key
+      type:              "appstore",
+      readonly:          true,
+      api_key:           api_key,
+      keychain_name:     ENV.fetch("MATCH_KEYCHAIN_NAME", "login.keychain"),
+      keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"]
     )
 
     # Bump and commit first so the signing edits below never end up in git.
