@@ -64,6 +64,11 @@ struct SleepDebtCardView: View {
 
     private var subtitle: String {
         let needText = SleepDebt.hoursText(summary.need)
+        if summary.recoveryStreak >= 2, summary.ledgerDebt >= SleepDebt.targetDebt * 0.6 {
+            return summary.recoveryStreak >= 3
+                ? "\(summary.recoveryStreak) nights on target · debt cleared"
+                : "\(summary.recoveryStreak) nights on target · recovering"
+        }
         switch summary.severity {
         case .low:      return "Well rested · need \(needText)"
         case .mild:     return "A little behind your \(needText) need"
@@ -172,7 +177,7 @@ struct SleepDebtDetailSheet: View {
     private var explainer: some View {
         VStack(alignment: .leading, spacing: 8) {
             DSSectionHeader(title: "How it's measured")
-            Text("Your need of \(SleepDebt.hoursText(summary.need)) is the 75th percentile of your sleep during your best-rested two weeks. Each night's hours are discounted for low efficiency or thin deep + REM sleep, and a hard training day adds up to 30 minutes of need. Last night counts 15 %, older nights fade over two weeks. Sleeping past your need repays at half rate.")
+            Text("Your need of \(SleepDebt.hoursText(summary.need)) is the 75th percentile of your sleep during your best-rested two weeks. Each night's hours are discounted for low efficiency or thin deep + REM sleep, and a hard training day adds up to 30 minutes of need. Last night counts 15 %, older nights fade over two weeks. Sleeping past your need repays at half rate, except on a recovery streak: two nights on target cuts the debt to 30 %, three or more clears it to 10 %, and any surplus on those nights repays in full. One short night breaks the streak.")
                 .font(.footnote)
                 .foregroundStyle(DS.textSecondary)
         }

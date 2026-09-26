@@ -49,10 +49,58 @@ final class SleepDebtTests: XCTestCase {
         XCTAssertEqual(s.totalDebt, 2 * SleepDebt.weights[0], accuracy: 1e-9)
     }
 
-    func testSurplusRepaysAtHalfRate() {
-        let short = SleepDebt.compute(nights: nights([7.5, 5.5]), need: 7.5).totalDebt
-        let repaid = SleepDebt.compute(nights: nights([9.5, 5.5]), need: 7.5).totalDebt
-        XCTAssertEqual(short - repaid, 2 * 0.5 * SleepDebt.weights[0], accuracy: 1e-9)
+    func testSurplusRepaysAtHalfRateOffStreak() {
+        // Surplus two nights ago, but last night was short, so no streak: half credit.
+        let short = SleepDebt.compute(nights: nights([5.5, 7.5, 5.5]), need: 7.5).ledgerDebt
+        let repaid = SleepDebt.compute(nights: nights([5.5, 9.5, 5.5]), need: 7.5).ledgerDebt
+        XCTAssertEqual(short - repaid, 2 * 0.5 * SleepDebt.weights[1], accuracy: 1e-9)
+    }
+
+    // MARK: Recovery streak
+
+    func testStreakCountsConsecutiveOnTargetNightsFromSelected() {
+        XCTAssertEqual(SleepDebt.compute(nights: nights([7.5, 7.5, 5.5, 7.5]), need: 7.5).recoveryStreak, 2)
+        XCTAssertEqual(SleepDebt.compute(nights: nights([5.5, 7.5, 7.5]), need: 7.5).recoveryStreak, 0)
+        // 5 % slack: 7.2h against a 7.5h need still counts.
+        XCTAssertEqual(SleepDebt.compute(nights: nights([7.2, 5.5]), need: 7.5).recoveryStreak, 1)
+        XCTAssertEqual(SleepDebt.compute(nights: nights([7.0, 5.5]), need: 7.5).recoveryStreak, 0)
+    }
+
+    func testStreakDiscountsLedger() {
+        let bad = Array(repeating: 5.5, count: 14)
+        let base = SleepDebt.compute(nights: nights(bad), need: 7.5)
+        XCTAssertEqual(base.recoveryStreak, 0)
+        XCTAssertEqual(base.totalDebt, base.ledgerDebt, accuracy: 1e-9)
+
+        let one = SleepDebt.compute(nights: nights([7.5] + bad.dropLast(1)), need: 7.5)
+        XCTAssertEqual(one.recoveryStreak, 1)
+        XCTAssertEqual(one.totalDebt, one.ledgerDebt * 0.6, accuracy: 1e-9)
+
+        let two = SleepDebt.compute(nights: nights([7.5, 7.5] + bad.dropLast(2)), need: 7.5)
+        XCTAssertEqual(two.totalDebt, two.ledgerDebt * 0.3, accuracy: 1e-9)
+
+        let three = SleepDebt.compute(nights: nights([7.5, 7.5, 7.5] + bad.dropLast(3)), need: 7.5)
+        XCTAssertEqual(three.totalDebt, three.ledgerDebt * 0.1, accuracy: 1e-9)
+        XCTAssertEqual(three.severity, .low)
+
+        let five = SleepDebt.compute(nights: nights(Array(repeating: 7.5, count: 5) + bad.dropLast(5)), need: 7.5)
+        XCTAssertEqual(five.totalDebt, five.ledgerDebt * 0.1, accuracy: 1e-9, "factor floors at 3+")
+    }
+
+    func testStreakNightsGetFullSurplusCredit() {
+        let bad = Array(repeating: 5.5, count: 12)
+        let atNeed = SleepDebt.compute(nights: nights([7.5, 7.5] + bad), need: 7.5)
+        let over   = SleepDebt.compute(nights: nights([9.5, 9.5] + bad), need: 7.5)
+        let expected = 2 * (SleepDebt.weights[0] + SleepDebt.weights[1])
+        XCTAssertEqual(atNeed.ledgerDebt - over.ledgerDebt, expected, accuracy: 1e-9)
+    }
+
+    func testShortNightAfterStreakBringsLedgerBack() {
+        let bad = Array(repeating: 5.5, count: 11)
+        let cleared = SleepDebt.compute(nights: nights([7.5, 7.5, 7.5] + bad), need: 7.5)
+        let relapse = SleepDebt.compute(nights: nights([5.0, 7.5, 7.5, 7.5] + bad.dropLast(1)), need: 7.5)
+        XCTAssertEqual(relapse.recoveryStreak, 0)
+        XCTAssertGreaterThan(relapse.totalDebt, cleared.totalDebt * 3)
     }
 
     func testDebtNeverNegative() {
@@ -121,7 +169,9 @@ final class SleepDebtTests: XCTestCase {
     func testHardDayRaisesNeedForThatNight() {
         let s = SleepDebt.compute(nights: nights([7.5], exercise: [105]), need: 7.5)
         XCTAssertEqual(s.ledger.first?.need ?? 0, 7.75, accuracy: 1e-9)
-        XCTAssertEqual(s.totalDebt, 0.25 * SleepDebt.weights[0], accuracy: 1e-9)
+        XCTAssertEqual(s.ledgerDebt, 0.25 * SleepDebt.weights[0], accuracy: 1e-9)
+        // 15 min under an adjusted need is within the 5 % slack, so it still streaks.
+        XCTAssertEqual(s.recoveryStreak, 1)
     }
 
     // MARK: Need

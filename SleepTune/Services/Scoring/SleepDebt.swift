@@ -63,6 +63,10 @@ struct SleepDebtSummary: Equatable, Sendable {
     let trend: Trend
     /// Most recent night last.
     let ledger: [SleepDebtLedgerEntry]
+    /// Consecutive nights, ending on the selected night, that met need.
+    let recoveryStreak: Int
+    /// Ledger debt before the recovery-streak discount was applied.
+    let ledgerDebt: Double
 
     enum Trend: Equatable, Sendable { case improving, steady, worsening }
 
@@ -78,13 +82,15 @@ struct SleepDebtSummary: Equatable, Sendable {
     }
 
     init(totalDebt: Double, nightsCounted: Int, avgHours: Double, need: Double, trend: Trend,
-         ledger: [SleepDebtLedgerEntry] = []) {
+         ledger: [SleepDebtLedgerEntry] = [], recoveryStreak: Int = 0, ledgerDebt: Double? = nil) {
         self.totalDebt = totalDebt
         self.nightsCounted = nightsCounted
         self.avgHours = avgHours
         self.need = need
         self.trend = trend
         self.ledger = ledger
+        self.recoveryStreak = recoveryStreak
+        self.ledgerDebt = ledgerDebt ?? totalDebt
     }
 }
 
@@ -94,6 +100,10 @@ struct SleepDebtSummary: Equatable, Sendable {
 ///   need_t   = baseline + strain bonus (prior-day exercise)
 ///   banked_t = hours × quality factor (efficiency, deep+REM vs personal baseline)
 ///   debt     = Σ w_k · (need − banked)   over the last 14 nights
+///
+/// A recovery streak (consecutive nights that banked ≥ 95 % of need, ending on
+/// the selected night) then discounts the ledger: ×0.6, ×0.3, ×0.1 for 1, 2, 3+
+/// nights, and surplus on those nights is credited in full.
 ///
 /// Weights sum to `weightTotal`, with the most recent night carrying 15 % and
 /// the remaining 85 % declining geometrically over the prior 13 nights. So a
@@ -106,6 +116,12 @@ enum SleepDebt {
     static let lastNightShare = 0.15
     static let decayRatio     = 0.85
     static let surplusCredit  = 0.5
+    /// Multiplier applied to the ledger after N consecutive on-target nights.
+    /// Recovery studies show most subjective/cognitive recovery within 2–3
+    /// full nights, so a streak pays debt down far faster than the ledger alone.
+    static let recoveryFactors: [Double] = [1.0, 0.6, 0.3, 0.1]
+    /// A night counts toward the streak when banked hours reach this share of need.
+    static let recoveryShare  = 0.95
     static let targetDebt     = 5.0
     static let defaultNeed    = 7.5
     /// Nights under this are almost certainly tracking failures, not sleep.
@@ -207,11 +223,12 @@ enum SleepDebt {
         }
         ledger.sort { $0.date < $1.date }
 
-        let current = weightedDebt(aged, need: need)
-        let past = weightedDebt(
-            aged.filter { $0.age >= 3 }.map { (age: $0.age - 3, delta: $0.delta) },
-            need: need
-        )
+        let streak = recoveryStreak(aged)
+        let ledgerDebt = weightedDebt(aged, need: need, streak: streak)
+        let current = ledgerDebt * recoveryFactor(streak)
+        let pastAged = aged.filter { $0.age >= 3 }.map { (age: $0.age - 3, delta: $0.delta) }
+        let pastStreak = recoveryStreak(pastAged)
+        let past = weightedDebt(pastAged, need: need, streak: pastStreak) * recoveryFactor(pastStreak)
         let trend: SleepDebtSummary.Trend
         switch current - past {
         case ..<(-0.5): trend = .improving
@@ -225,14 +242,33 @@ enum SleepDebt {
             avgHours: ledger.map(\.hours).reduce(0, +) / Double(Swift.max(ledger.count, 1)),
             need: need,
             trend: trend,
-            ledger: ledger
+            ledger: ledger,
+            recoveryStreak: streak,
+            ledgerDebt: ledgerDebt
         )
     }
 
-    private static func weightedDebt(_ nights: [(age: Int, delta: Double)], need: Double) -> Double {
+    /// Consecutive nights from age 0 upward whose banked hours met the need
+    /// (delta ≤ need × (1 − recoveryShare)). A missing night breaks the streak.
+    static func recoveryStreak(_ nights: [(age: Int, delta: Double)]) -> Int {
+        let byAge = Dictionary(nights.map { ($0.age, $0.delta) }, uniquingKeysWith: { a, _ in a })
+        // Up to 5 % under need still counts as "on target".
+        let slack = defaultNeed * (1 - recoveryShare)
+        var streak = 0
+        while let delta = byAge[streak], delta <= slack { streak += 1 }
+        return streak
+    }
+
+    static func recoveryFactor(_ streak: Int) -> Double {
+        recoveryFactors[Swift.min(streak, recoveryFactors.count - 1)]
+    }
+
+    private static func weightedDebt(_ nights: [(age: Int, delta: Double)], need: Double, streak: Int = 0) -> Double {
         var debt = 0.0
         for n in nights where n.age < windowNights {
-            let contribution = n.delta >= 0 ? n.delta : n.delta * surplusCredit
+            // Surplus on streak nights repays in full; elsewhere half-credit.
+            let credit = n.age < streak ? 1.0 : surplusCredit
+            let contribution = n.delta >= 0 ? n.delta : n.delta * credit
             debt += contribution * weights[n.age]
         }
         return Swift.min(Swift.max(0, debt), need * 2)
