@@ -97,6 +97,22 @@ struct SettingsView: View {
                 .listRowSeparatorTint(DS.border)
 
                 Section {
+                    HistoryBackfillRow(backfill: container.historyBackfill)
+                } header: {
+                    Text("History")
+                        .font(.footnote.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(DS.textTertiary)
+                        .textCase(.uppercase)
+                } footer: {
+                    Text("SleepTune keeps up to a year of nightly summaries on this device for trends and correlations. Rebuild if numbers look wrong.")
+                        .font(.caption2)
+                        .foregroundStyle(DS.textTertiary)
+                }
+                .listRowBackground(DS.surface)
+                .listRowSeparatorTint(DS.border)
+
+                Section {
                     Button {
                         Task {
                             resettingShare = true
@@ -150,5 +166,51 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .toolbarColorScheme(.dark, for: .navigationBar)
         .sheet(isPresented: $showEmojiPicker) { EmojiPickerView() }
+    }
+}
+
+// MARK: - History backfill row
+
+private struct HistoryBackfillRow: View {
+    let backfill: HistoryBackfill
+    @State private var confirming = false
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Sleep history", systemImage: "clock.arrow.circlepath")
+                    .foregroundStyle(DS.textPrimary)
+                Text(statusText)
+                    .font(.caption2)
+                    .foregroundStyle(DS.textTertiary)
+            }
+            Spacer()
+            switch backfill.state {
+            case .running:
+                ProgressView().tint(DS.textSecondary).scaleEffect(0.8)
+            default:
+                Button("Rebuild") { confirming = true }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(DS.purple)
+            }
+        }
+        .confirmationDialog("Rebuild sleep history?", isPresented: $confirming, titleVisibility: .visible) {
+            Button("Rebuild from Health", role: .destructive) {
+                Task { await backfill.rebuild() }
+            }
+        } message: {
+            Text("Re-imports up to a year of nights from Apple Health. Takes a few minutes in the background.")
+        }
+    }
+
+    private var statusText: String {
+        switch backfill.state {
+        case .idle:
+            return backfill.isComplete ? "Up to date" : "Waiting to import"
+        case .running(let done, let total):
+            return "Importing… \(done) of ~\(total) nights"
+        case .complete(let n):
+            return "\(n) nights imported"
+        }
     }
 }

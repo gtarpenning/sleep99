@@ -3,140 +3,170 @@ import XCTest
 
 final class SleepDebtTests: XCTestCase {
 
-    /// hours[0] is last night (age 0), hours[1] the night before, etc.
-    private func nights(_ hours: [Double]) -> [SleepDebtNight] {
-        let cal = Calendar.current
+    private let cal = Calendar.current
+
+    /// hours[0] is the selected night (age 0), hours[1] the night before, etc.
+    private func nights(_ hours: [Double], efficiency: Double? = nil, exercise: [Double?]? = nil) -> [SleepDebtNight] {
         let base = cal.startOfDay(for: Date())
         return hours.enumerated().map { i, h in
-            SleepDebtNight(date: cal.date(byAdding: .day, value: -i, to: base)!, hours: h)
+            SleepDebtNight(
+                date: cal.date(byAdding: .day, value: -i, to: base)!,
+                hours: h,
+                efficiencyPercent: efficiency,
+                exerciseMinutesPrevDay: exercise?[i] ?? nil
+            )
         }
     }
 
+    // MARK: Weights
+
+    func testWeightsSumToTotalAndLastNightIsFifteenPercent() {
+        XCTAssertEqual(SleepDebt.weights.count, 14)
+        XCTAssertEqual(SleepDebt.weights.reduce(0, +), SleepDebt.weightTotal, accuracy: 1e-9)
+        XCTAssertEqual(SleepDebt.weights[0], SleepDebt.weightTotal * 0.15, accuracy: 1e-9)
+        for k in 1..<13 { XCTAssertGreaterThan(SleepDebt.weights[k], SleepDebt.weights[k + 1]) }
+    }
+
+    // MARK: Compute
+
     func testZeroDebtWhenAlwaysAtNeed() {
-        let summary = SleepDebt.compute(nights: nights(Array(repeating: 7.5, count: 10)), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 0, accuracy: 0.001)
-        XCTAssertEqual(summary.severity, .none)
-        XCTAssertEqual(summary.trend, .steady)
+        let s = SleepDebt.compute(nights: nights(Array(repeating: 7.5, count: 14)), need: 7.5)
+        XCTAssertEqual(s.totalDebt, 0, accuracy: 1e-9)
+        XCTAssertEqual(s.severity, .low)
+        XCTAssertEqual(s.trend, .steady)
+        XCTAssertEqual(s.ledger.count, 14)
     }
 
-    func testTwoNormalNightsCrushOneHourDebt() {
-        // 1h shortfall two nights ago, normal sleep since → 1 × 0.7² = 0.49,
-        // below the 0.5h "caught up" display threshold.
-        let summary = SleepDebt.compute(nights: nights([7.5, 7.5, 6.5]), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 0.49, accuracy: 0.001)
-        XCTAssertEqual(SleepDebt.summaryText(for: summary), "Caught up")
+    func testSteadyOneHourShortfallLandsOnTarget() {
+        // 1h short every night for 14 nights → weights sum × 1h = 5h = target.
+        let s = SleepDebt.compute(nights: nights(Array(repeating: 6.5, count: 14)), need: 7.5)
+        XCTAssertEqual(s.totalDebt, SleepDebt.targetDebt, accuracy: 1e-9)
+        XCTAssertEqual(s.severity, .moderate)
     }
 
-    func testRecentShortfallCountsInFull() {
-        let summary = SleepDebt.compute(nights: nights([6.5]), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 1.0, accuracy: 0.001)
+    func testSelectedNightCountsAtLastNightShare() {
+        let s = SleepDebt.compute(nights: nights([5.5]), need: 7.5)
+        XCTAssertEqual(s.totalDebt, 2 * SleepDebt.weights[0], accuracy: 1e-9)
     }
 
     func testSurplusRepaysAtHalfRate() {
-        // 2h shortfall last night (age 1, weight 0.7 → 1.4h), then a 2h
-        // surplus night (credit 2 × 0.5 = 1h) → 0.4h remaining.
-        let summary = SleepDebt.compute(nights: nights([9.5, 5.5]), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 0.4, accuracy: 0.001)
+        let short = SleepDebt.compute(nights: nights([7.5, 5.5]), need: 7.5).totalDebt
+        let repaid = SleepDebt.compute(nights: nights([9.5, 5.5]), need: 7.5).totalDebt
+        XCTAssertEqual(short - repaid, 2 * 0.5 * SleepDebt.weights[0], accuracy: 1e-9)
     }
 
-    func testSurplusNeverPushesDebtBelowZero() {
-        let summary = SleepDebt.compute(nights: nights([10, 10, 10]), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 0, accuracy: 0.001)
+    func testDebtNeverNegative() {
+        let s = SleepDebt.compute(nights: nights(Array(repeating: 9.5, count: 14)), need: 7.5)
+        XCTAssertEqual(s.totalDebt, 0)
     }
 
-    func testChronicShortfallIsBoundedNotUnbounded() {
-        // 1h short every night for 10 nights: Σ 0.7^i ≈ 3.24 — reads as
-        // "persistently a few hours behind" instead of 10h and climbing.
-        let summary = SleepDebt.compute(nights: nights(Array(repeating: 6.5, count: 10)), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 3.24, accuracy: 0.01)
-        XCTAssertEqual(summary.severity, .moderate)
+    func testDebtCappedAtTwiceNeed() {
+        let s = SleepDebt.compute(nights: nights(Array(repeating: 3.0, count: 14)), need: 7.5)
+        XCTAssertEqual(s.totalDebt, 15, accuracy: 1e-9)
     }
 
-    func testDebtIsCappedAtTwiceNeed() {
-        // 3h nights against a 9h need: 6 × Σ0.7^i ≈ 19.4h raw → capped at 18.
-        let summary = SleepDebt.compute(nights: nights(Array(repeating: 3, count: 10)), need: 9)
-        XCTAssertEqual(summary.totalDebt, 18, accuracy: 0.001)
-        XCTAssertEqual(summary.severity, .high)
+    func testSubThreeHourNightsAreDropped() {
+        let s = SleepDebt.compute(nights: nights([7.5, 1.0, 7.5]), need: 7.5)
+        XCTAssertEqual(s.nightsCounted, 2)
+        XCTAssertEqual(s.totalDebt, 0, accuracy: 1e-9)
     }
 
-    func testSubThreeHourNightsExcludedAsTrackingNoise() {
-        // A 1h "night" (watch died) contributes nothing — same as untracked.
-        let withNoise = SleepDebt.compute(nights: nights([7.5, 1.0, 7.5]), need: 7.5)
-        XCTAssertEqual(withNoise.totalDebt, 0, accuracy: 0.001)
-        XCTAssertEqual(withNoise.nightsCounted, 2)
-
-        // Exactly 3h is kept — a real (terrible) night.
-        let boundary = SleepDebt.compute(nights: nights([3.0]), need: 7.5)
-        XCTAssertEqual(boundary.totalDebt, 4.5, accuracy: 0.001)
+    func testOlderThanFourteenNightsIgnored() {
+        let s = SleepDebt.compute(nights: nights(Array(repeating: 7.5, count: 14) + [3.5]), need: 7.5)
+        XCTAssertEqual(s.totalDebt, 0, accuracy: 1e-9)
+        XCTAssertEqual(s.nightsCounted, 14)
     }
 
-    func testAllNoiseNightsReturnsEmptySummary() {
-        let summary = SleepDebt.compute(nights: nights([1, 2, 0.5]), need: 7.5)
-        XCTAssertEqual(summary.totalDebt, 0)
-        XCTAssertEqual(summary.nightsCounted, 0)
+    func testAgeComesFromDatesNotOrder() {
+        let base = cal.startOfDay(for: Date())
+        let shuffled = [
+            SleepDebtNight(date: cal.date(byAdding: .day, value: -3, to: base)!, hours: 7.5),
+            SleepDebtNight(date: base, hours: 5.5),
+            SleepDebtNight(date: cal.date(byAdding: .day, value: -1, to: base)!, hours: 7.5),
+        ]
+        XCTAssertEqual(SleepDebt.compute(nights: shuffled, need: 7.5).totalDebt, 2 * SleepDebt.weights[0], accuracy: 1e-9)
     }
 
-    func testTrendImprovingAfterRecoveryNights() {
-        // Big shortfalls 3-5 nights ago, normal since → debt is melting.
-        let summary = SleepDebt.compute(nights: nights([7.5, 7.5, 7.5, 5, 5, 5]), need: 7.5)
-        XCTAssertEqual(summary.trend, .improving)
+    // MARK: Quality adjustment
+
+    func testLowEfficiencyShrinksBankedHours() {
+        let good = SleepDebt.compute(nights: nights([7.5], efficiency: 95), need: 7.5).totalDebt
+        let poor = SleepDebt.compute(nights: nights([7.5], efficiency: 70), need: 7.5).totalDebt
+        XCTAssertEqual(good, 0, accuracy: 1e-9)
+        XCTAssertGreaterThan(poor, 0)
+        // 7.5 × (70/85) = 6.18 → 1.32h short × w0
+        XCTAssertEqual(poor, (7.5 - 7.5 * 70 / 85) * SleepDebt.weights[0], accuracy: 1e-6)
     }
 
-    func testTrendWorseningWithFreshShortfalls() {
-        let summary = SleepDebt.compute(nights: nights([5, 5, 7.5, 7.5, 7.5, 7.5]), need: 7.5)
-        XCTAssertEqual(summary.trend, .worsening)
+    func testQualityFactorFloorsAtSeventyPercent() {
+        let n = SleepDebtNight(date: Date(), hours: 8, efficiencyPercent: 40, deepRemMinutes: 10)
+        XCTAssertEqual(SleepDebt.effectiveHours(n, baselineDeepRem: 180), 8 * 0.7, accuracy: 1e-9)
     }
 
-    func testSeverityBuckets() {
-        XCTAssertEqual(SleepDebt.compute(nights: nights([7.5]), need: 7.5).severity, .none)
-        XCTAssertEqual(SleepDebt.compute(nights: nights([6]), need: 7.5).severity, .mild)       // 1.5h
-        XCTAssertEqual(SleepDebt.compute(nights: nights([4.5]), need: 7.5).severity, .moderate) // 3h
-        XCTAssertEqual(SleepDebt.compute(nights: nights([3, 4]), need: 7.5).severity, .high)    // 4.5 + 3.5×0.7 = 6.95h
+    func testThinDeepRemReducesBankedHours() {
+        let n = SleepDebtNight(date: Date(), hours: 8, deepRemMinutes: 90)
+        // 50 % below baseline → factor 1 − 0.5 × 0.5 = 0.75
+        XCTAssertEqual(SleepDebt.effectiveHours(n, baselineDeepRem: 180), 6, accuracy: 1e-9)
     }
 
-    func testEmptyInputReturnsZero() {
-        let summary = SleepDebt.compute(nights: [])
-        XCTAssertEqual(summary.totalDebt, 0)
-        XCTAssertEqual(summary.nightsCounted, 0)
+    // MARK: Strain
+
+    func testStrainBonusOnlyAboveFortyFiveMinutesAndCapped() {
+        XCTAssertEqual(SleepDebt.strainBonus(exerciseMinutes: nil), 0)
+        XCTAssertEqual(SleepDebt.strainBonus(exerciseMinutes: 30), 0)
+        XCTAssertEqual(SleepDebt.strainBonus(exerciseMinutes: 105), 0.25, accuracy: 1e-9)
+        XCTAssertEqual(SleepDebt.strainBonus(exerciseMinutes: 400), 0.5, accuracy: 1e-9)
     }
 
-    func testSummaryTextRoundsToHalfHours() {
-        let behind = SleepDebt.compute(nights: nights([4.5]), need: 7.5) // 3h
-        XCTAssertEqual(SleepDebt.summaryText(for: behind), "3h behind")
-
-        let fractional = SleepDebt.compute(nights: nights([6]), need: 7.5) // 1.5h
-        XCTAssertEqual(SleepDebt.summaryText(for: fractional), "1.5h behind")
+    func testHardDayRaisesNeedForThatNight() {
+        let s = SleepDebt.compute(nights: nights([7.5], exercise: [105]), need: 7.5)
+        XCTAssertEqual(s.ledger.first?.need ?? 0, 7.75, accuracy: 1e-9)
+        XCTAssertEqual(s.totalDebt, 0.25 * SleepDebt.weights[0], accuracy: 1e-9)
     }
 
-    // MARK: - Sleep need estimation
+    // MARK: Need
 
-    private func stats(_ values: [Double]) -> MetricStats {
-        let sorted = values.sorted()
-        return MetricStats(
-            avg: values.reduce(0, +) / Double(values.count),
-            min: sorted.first ?? 0,
-            max: sorted.last ?? 0,
-            count: values.count,
-            sortedValues: sorted
-        )
+    func testBaselineNeedFallsBackWithLittleHistory() {
+        XCTAssertEqual(SleepDebt.baselineNeed(from: nights([7, 7, 7])), SleepDebt.defaultNeed)
     }
 
-    func testSleepNeedUsesP60OfHistory() {
-        // p60 of [6, 6.5, 7, 7.5, 8] → index 2.4 → 7 + 0.4 × 0.5 = 7.2
-        XCTAssertEqual(SleepDebt.sleepNeed(from: stats([6, 6.5, 7, 7.5, 8])), 7.2, accuracy: 0.001)
+    func testBaselineNeedUsesBestRestedFortnight() {
+        // 14 great nights at 8.2h (score 90) followed by 14 bad nights at 6h (score 50).
+        // A rolling mean would say ~7.1; the best-rested window says ~8.2.
+        let base = cal.startOfDay(for: Date())
+        var history: [SleepDebtNight] = []
+        for i in 0..<28 {
+            let good = i >= 14
+            history.append(SleepDebtNight(
+                date: cal.date(byAdding: .day, value: -i, to: base)!,
+                hours: good ? 8.2 : 6.0, score: good ? 90 : 50
+            ))
+        }
+        XCTAssertEqual(SleepDebt.baselineNeed(from: history), 8.2, accuracy: 0.01)
     }
 
-    func testSleepNeedIsFloorClamped() {
-        // Chronic short sleeper can't define deprivation away.
-        XCTAssertEqual(SleepDebt.sleepNeed(from: stats([5, 5.2, 5.4, 5.6, 5.8])), 6.5)
+    func testBaselineNeedIsClamped() {
+        XCTAssertEqual(SleepDebt.baselineNeed(from: nights(Array(repeating: 5.0, count: 10))), 6.5)
+        XCTAssertEqual(SleepDebt.baselineNeed(from: nights(Array(repeating: 10.0, count: 10))), 9.0)
     }
 
-    func testSleepNeedIsCeilingClamped() {
-        XCTAssertEqual(SleepDebt.sleepNeed(from: stats([9.5, 9.6, 9.7, 9.8, 9.9])), 9.0)
+    // MARK: Trend
+
+    func testTrendWorseningAfterRecentShortNights() {
+        let s = SleepDebt.compute(nights: nights([5, 5, 5] + Array(repeating: 7.5, count: 11)), need: 7.5)
+        XCTAssertEqual(s.trend, .worsening)
     }
 
-    func testSleepNeedFallsBackWithSparseHistory() {
-        XCTAssertEqual(SleepDebt.sleepNeed(from: nil), SleepDebt.defaultNeed)
-        XCTAssertEqual(SleepDebt.sleepNeed(from: stats([7, 8])), SleepDebt.defaultNeed)
+    func testTrendImprovingAfterRecentGoodNights() {
+        let s = SleepDebt.compute(nights: nights([7.5, 7.5, 7.5, 5, 5, 5] + Array(repeating: 7.5, count: 8)), need: 7.5)
+        XCTAssertEqual(s.trend, .improving)
+    }
+
+    // MARK: Formatting
+
+    func testHoursText() {
+        XCTAssertEqual(SleepDebt.hoursText(0.2), "0h")
+        XCTAssertEqual(SleepDebt.hoursText(2.3), "2.5h")
+        XCTAssertEqual(SleepDebt.hoursText(3.0), "3h")
     }
 }

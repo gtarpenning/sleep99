@@ -17,6 +17,13 @@ final class ChartSnapshotTests: XCTestCase {
         try Self.write(view, name: "lastnight", width: 350)
     }
 
+    func testRenderSleepDebtCard() throws {
+        let nights = MockSleepData.nightSummaries(count: 30).map(SleepDebtNight.init)
+        let need = SleepDebt.baselineNeed(from: nights)
+        let summary = SleepDebt.compute(nights: Array(nights.suffix(14)), need: need, baselineDeepRem: 170)
+        try Self.write(SleepDebtCardView(summary: summary), name: "debtcard", width: 390)
+    }
+
     static func write<V: View>(_ view: V, name: String, width: CGFloat) throws {
         let wrapped = view
             .frame(width: width)

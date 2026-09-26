@@ -98,6 +98,14 @@
 		F3D918715EA14AA63C5C740C /* Charts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BDD5B56583514E3C10DC2B5 /* Charts.framework */; };
 		F69722A4DFA99DFB84104037 /* SleepTuneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC23E760633D27AE99B4CBE4 /* SleepTuneApp.swift */; };
 		BC140618F07957D423C28EA2 /* ChartSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */; };
+		B099706B1E8C3306E068A1A2 /* NightSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC099706B1E8C3306E068A1A /* NightSummary.swift */; };
+		B9EBDA6098147925738912BA /* NightRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD9EBDA6098147925738912B /* NightRecord.swift */; };
+		B48F352AE7FDAB85ADE65F62 /* NightRecordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F548F352AE7FDAB85ADE65F6 /* NightRecordStore.swift */; };
+		B8BBDB68022C5636465A65CF /* HistoryBackfill.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88BBDB68022C5636465A65C /* HistoryBackfill.swift */; };
+		B8808D625669CAE071173ACE /* NightRecordStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA8808D625669CAE071173AC /* NightRecordStoreTests.swift */; };
+		B7F4E929DD8BA952DA412D69 /* AlcoholHeuristicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */; };
+		BA114A2097288039D15C26A0 /* AlcoholHeuristic.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */; };
+		B968F2C11B3C8B830CD97656 /* AlcoholCalloutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2968F2C11B3C8B830CD9765 /* AlcoholCalloutView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -230,6 +238,14 @@
 		FBEB0AE316AF9D015ED37561 /* SleepStageSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStageSample.swift; sourceTree = "<group>"; };
 		FC23E760633D27AE99B4CBE4 /* SleepTuneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepTuneApp.swift; sourceTree = "<group>"; };
 		F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSnapshotTests.swift; sourceTree = "<group>"; };
+		FC099706B1E8C3306E068A1A /* NightSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightSummary.swift; sourceTree = "<group>"; };
+		FD9EBDA6098147925738912B /* NightRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightRecord.swift; sourceTree = "<group>"; };
+		F548F352AE7FDAB85ADE65F6 /* NightRecordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightRecordStore.swift; sourceTree = "<group>"; };
+		F88BBDB68022C5636465A65C /* HistoryBackfill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryBackfill.swift; sourceTree = "<group>"; };
+		FA8808D625669CAE071173AC /* NightRecordStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightRecordStoreTests.swift; sourceTree = "<group>"; };
+		F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcoholHeuristicTests.swift; sourceTree = "<group>"; };
+		FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcoholHeuristic.swift; sourceTree = "<group>"; };
+		F2968F2C11B3C8B830CD9765 /* AlcoholCalloutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlcoholCalloutView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -254,6 +270,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A11A1A1A1A1A1A1A1A1A1A1A /* Analytics */ = {
+			isa = PBXGroup;
+			children = (
+				FEA114A2097288039D15C26A /* AlcoholHeuristic.swift */,
+			);
+			path = Analytics;
+			sourceTree = "<group>";
+		};
 		0F11F8F6FC8EC0864A28600A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -268,6 +292,7 @@
 		131C89773AEDD6E5F2C7245C /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				FC099706B1E8C3306E068A1A /* NightSummary.swift */,
 				4B7BDF3D679F7B9496309A4A /* HealthAuthorizationState.swift */,
 				B3C4D5E6F7A8B9C0D1E2F3A4 /* DailyActivitySnapshot.swift */,
 				77590112275E2A5C6D5B4BCA /* MetricStats.swift */,
@@ -396,6 +421,7 @@
 		4A08AE93BCB28ACD44F0E595 /* HealthKit */ = {
 			isa = PBXGroup;
 			children = (
+				F88BBDB68022C5636465A65C /* HistoryBackfill.swift */,
 				CC0DFB4616F9B90768099BDD /* HealthKitClient.swift */,
 				E8FC625601AD8E142789A45A /* SleepDataAggregator.swift */,
 			);
@@ -445,6 +471,8 @@
 		A73B75D79D0E69E6FDD54A8A /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				F548F352AE7FDAB85ADE65F6 /* NightRecordStore.swift */,
+				FD9EBDA6098147925738912B /* NightRecord.swift */,
 				9DA7B090374DFCA980C193D8 /* LocalStore.swift */,
 				8AF27EFABAF01B3AD244CDF7 /* SleepTagStore.swift */,
 				BBBB0005000000000000A005 /* SubjectiveRatingStore.swift */,
@@ -464,6 +492,7 @@
 		B279BDDE871FE96F6413919A /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A11A1A1A1A1A1A1A1A1A1A1A /* Analytics */,
 				A6D8EE862578717C20F98A76 /* Auth */,
 				17CC56DB94A3802A5F96B175 /* CloudKit */,
 				4A08AE93BCB28ACD44F0E595 /* HealthKit */,
@@ -486,6 +515,8 @@
 		CD291F50BE4CB28EF8E5E9D9 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				F27F4E929DD8BA952DA412D6 /* AlcoholHeuristicTests.swift */,
+				FA8808D625669CAE071173AC /* NightRecordStoreTests.swift */,
 				F8C140618F07957D423C28EA /* ChartSnapshotTests.swift */,
 				743EDC63B61B3A40FB87B8B0 /* Info.plist */,
 				4B8E63173E63ED2B36D0DF07 /* SleepScoreEngineTests.swift */,
@@ -510,6 +541,7 @@
 		DFC7662F721CFAFEDFD26E2F /* Dashboard */ = {
 			isa = PBXGroup;
 			children = (
+				F2968F2C11B3C8B830CD9765 /* AlcoholCalloutView.swift */,
 				E64099BD55001FABC9488399 /* DashboardViewModel.swift */,
 				F1DF06D15A443D5C07C933D5 /* DopplerStripeView.swift */,
 				31260ECD210A48EAAC4477BA /* HealthAccessFullScreenView.swift */,
@@ -668,6 +700,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B7F4E929DD8BA952DA412D69 /* AlcoholHeuristicTests.swift in Sources */,
+				B8808D625669CAE071173ACE /* NightRecordStoreTests.swift in Sources */,
 				BC140618F07957D423C28EA2 /* ChartSnapshotTests.swift in Sources */,
 				E20F30C0BC78B8430CADF2DC /* SleepScoreEngineTests.swift in Sources */,
 				AAAA0009000000000000A009 /* SleepStressTests.swift in Sources */,
@@ -688,6 +722,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B968F2C11B3C8B830CD97656 /* AlcoholCalloutView.swift in Sources */,
+				BA114A2097288039D15C26A0 /* AlcoholHeuristic.swift in Sources */,
+				B8BBDB68022C5636465A65CF /* HistoryBackfill.swift in Sources */,
+				B48F352AE7FDAB85ADE65F62 /* NightRecordStore.swift in Sources */,
+				B9EBDA6098147925738912BA /* NightRecord.swift in Sources */,
+				B099706B1E8C3306E068A1A2 /* NightSummary.swift in Sources */,
 				230453A43002C83B3556E02A /* AccountView.swift in Sources */,
 				A9CF1742761DF17AD41C828A /* AppContainer.swift in Sources */,
 				87A50845097B43D1E002D4E4 /* AppDelegate.swift in Sources */,

@@ -10,8 +10,14 @@ extension AppContainer {
         // no stale UserDefaults cache can shadow the mock indicators.
         let container = AppContainer(
             healthKitClient: MockHealthKitClient(),
-            localStore: MockSleepStore()
+            localStore: MockSleepStore(),
+            nightStore: NightRecordStore(modelContainer: NightRecordStore.makeContainer(inMemory: true))
         )
+        // Seed 120 nights so trends, debt and correlations have something to chew on.
+        let seeded = MockSleepData.nightSummaries(count: 120)
+        let store = container.dashboardViewModel.nightStore
+        Task { try? await store.upsert(seeded) }
+        UserDefaults.standard.set(true, forKey: HistoryBackfill.completeKey)
         container.authService.userID = "mock-user"
         container.authService.displayName = "You (Mock)"
         container.authService.avatarEmoji = "😴"
@@ -51,6 +57,7 @@ final class AppContainer {
     let familyFeedViewModel: FamilyFeedViewModel
     let tagStore: SleepTagStore
     let subjectiveRatingStore: SubjectiveRatingStore
+    let historyBackfill: HistoryBackfill
 
     private let healthKitClient: HealthKitClient
     private let scoreEngine: SleepScoreEngine
@@ -59,7 +66,8 @@ final class AppContainer {
     init(
         healthKitClient: HealthKitClient = HealthKitClient(),
         scoreEngine: SleepScoreEngine = SleepScoreEngine(),
-        localStore: SleepLocalStore = UserDefaultsSleepStore()
+        localStore: SleepLocalStore = UserDefaultsSleepStore(),
+        nightStore: NightRecordStore = NightRecordStore(modelContainer: NightRecordStore.makeContainer())
     ) {
         let auth = AuthService()
         let cloudKit = CloudKitService()
@@ -72,14 +80,18 @@ final class AppContainer {
         self.tagStore = SleepTagStore()
         self.subjectiveRatingStore = SubjectiveRatingStore()
 
+        let backfill = HistoryBackfill(healthKitClient: healthKitClient, scoreEngine: scoreEngine, store: nightStore)
+        self.historyBackfill = backfill
         let vm = DashboardViewModel(
             healthKitClient: healthKitClient,
             scoreEngine: scoreEngine,
             localStore: localStore,
             authService: auth,
-            cloudKitService: cloudKit
+            cloudKitService: cloudKit,
+            nightStore: nightStore
         )
         vm.tagStore = tagStore
+        vm.backfill = backfill
         self.dashboardViewModel = vm
         self.settingsViewModel = SettingsViewModel(healthKitClient: healthKitClient)
         self.familyFeedViewModel = FamilyFeedViewModel(

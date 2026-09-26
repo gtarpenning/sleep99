@@ -21,6 +21,10 @@ final class DashboardViewModel {
     var monthlyStats: [String: MetricStats] = [:]
     var activityMonthlyStats: [String: MetricStats] = [:]
     var sleepDebt: SleepDebtSummary?
+    /// Alcohol heuristic for the selected night; nil when nothing fired.
+    var alcoholResult: AlcoholHeuristic.Result?
+    /// The user's confirmation for the selected night, if any.
+    var alcoholConfirmed: Bool?
 
     /// Effective baselines for scoreMetric() — delegates to effectiveBaseline() which is
     /// the single source of truth for aspirational percentile targets across all metrics.
@@ -44,18 +48,23 @@ final class DashboardViewModel {
     private let authService: AuthService
     private let cloudKitService: CloudKitService
     private let tagInsightEngine = TagInsightEngine()
+    let nightStore: NightRecordStore
     var tagStore: SleepTagStore?
+    /// Set by the container; kicks off the one-time history import once authorized.
+    var backfill: HistoryBackfill?
 
     init(
         healthKitClient: HealthKitClient,
         scoreEngine: SleepScoreEngine,
         localStore: SleepLocalStore,
         authService: AuthService,
-        cloudKitService: CloudKitService
+        cloudKitService: CloudKitService,
+        nightStore: NightRecordStore
     ) {
         self.healthKitClient = healthKitClient
         self.scoreEngine = scoreEngine
         self.localStore = localStore
+        self.nightStore = nightStore
         self.authService = authService
         self.cloudKitService = cloudKitService
         let today = Date()
@@ -95,6 +104,8 @@ final class DashboardViewModel {
             resetDashboardData()
             return
         }
+
+        backfill?.startIfNeeded()
 
         let stored = await localStore.loadIndicators(for: selectedDate)
         if !stored.isEmpty {
@@ -184,6 +195,8 @@ final class DashboardViewModel {
                 recoveryScore: capturedSummary.recoveryScore,
                 for: capturedDate
             )
+            await upsertNightRecord(indicators: capturedIndicators, summary: capturedSummary, date: capturedDate)
+            await evaluateAlcohol()
             await loadTrendHistory()
             await loadSleepDebt()
             await publishToCloudKit(capturedSummary)
@@ -239,6 +252,7 @@ final class DashboardViewModel {
                         recoveryScore: daySummary.recoveryScore,
                         for: day
                     )
+                    await upsertNightRecord(indicators: fetched, summary: daySummary, date: day)
                 }
             }
             if await localStore.loadActivitySnapshot(for: day) == nil {
@@ -246,6 +260,7 @@ final class DashboardViewModel {
                 await localStore.saveActivitySnapshot(snap, for: day)
             }
         }
+        await importLegacyCacheIfNeeded()
         await loadTrendHistory()
         await loadActivityMonthlyStats()
     }
@@ -397,97 +412,195 @@ final class DashboardViewModel {
         scoreHistory = []
     }
 
-    private func loadMonthlyStats() async {
+    // MARK: - Alcohol heuristic
+
+    static let drinksTagName = "Drinks"
+
+    private func evaluateAlcohol() async {
         let cal = Calendar.current
-        let today = Date()
-        var totals: [String: (sum: Double, min: Double, max: Double, count: Int, values: [Double])] = [:]
-        for offset in 1...30 {
-            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let cached = await localStore.loadIndicators(for: day)
-            for indicator in cached {
-                var e = totals[indicator.name] ?? (0, .infinity, -.infinity, 0, [])
-                e.sum   += indicator.value
-                e.min    = Swift.min(e.min, indicator.value)
-                e.max    = Swift.max(e.max, indicator.value)
-                e.count += 1
-                e.values.append(indicator.value)
-                totals[indicator.name] = e
-            }
+        let selected = cal.startOfDay(for: selectedDate)
+        guard let historyStart = cal.date(byAdding: .day, value: -60, to: selected),
+              let historyEnd = cal.date(byAdding: .day, value: -1, to: selected),
+              let night = AlcoholHeuristic.night(from: indicators) else {
+            alcoholResult = nil; alcoholConfirmed = nil; return
         }
-        monthlyStats = totals.compactMapValues { t in
-            guard t.count > 0, t.min != .infinity else { return nil }
-            return MetricStats(
-                avg: t.sum / Double(t.count),
-                min: t.min,
-                max: t.max,
-                count: t.count,
-                sortedValues: t.values.sorted()
-            )
+        let history = (try? await nightStore.records(from: historyStart, to: historyEnd)) ?? []
+        let stored = try? await nightStore.record(for: selected)
+        alcoholConfirmed = stored?.alcoholFlag
+        guard let baseline = AlcoholHeuristic.baseline(from: history) else { alcoholResult = nil; return }
+        let result = AlcoholHeuristic.evaluate(night: night, baseline: baseline)
+        // Show the pill when the heuristic fired, or when the user already confirmed.
+        alcoholResult = (result.verdict != .none || alcoholConfirmed == true) ? result : nil
+    }
+
+    /// Records the user's answer: flags the night record and syncs the "Drinks" tag.
+    func confirmAlcohol(_ drank: Bool) {
+        alcoholConfirmed = drank
+        let date = selectedDate
+        Task { @MainActor in
+            try? await nightStore.update(key: NightSummary.key(for: Calendar.current.startOfDay(for: date))) {
+                $0.alcoholFlag = drank
+            }
+            if let tagStore {
+                if tagStore.availableTags.first(where: { $0.name == Self.drinksTagName }) == nil, drank {
+                    tagStore.addTag(name: Self.drinksTagName)
+                }
+                if let tag = tagStore.availableTags.first(where: { $0.name == Self.drinksTagName }),
+                   tagStore.isActive(tag, for: date) != drank {
+                    tagStore.toggle(tag, for: date)
+                }
+            }
+            await refreshTagInsights()
         }
     }
 
-    private func loadActivityMonthlyStats() async {
+    // MARK: - Night record plumbing
+
+    /// Writes the selected night into the long-range store. Activity is the
+    /// previous day's, signals give max HR, stages give the sleep window.
+    private func upsertNightRecord(indicators: [SleepIndicator], summary: SleepScoreSummary, date: Date) async {
+        let prevDay = Calendar.current.date(byAdding: .day, value: -1, to: date) ?? date
+        let activity = await localStore.loadActivitySnapshot(for: prevDay)
+        let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
+        var record = NightSummary.make(
+            night: date,
+            indicators: indicators,
+            summary: summary,
+            activity: activity,
+            signals: [],
+            sleepInterval: isSelected ? sleepInterval : nil
+        )
+        if isSelected, let hr = lastNightHeartRateSeries {
+            record.maxHR = hr.points.map(\.value).max()
+        }
+        // Keep fields we can't recompute here.
+        if let existing = try? await nightStore.record(for: date) {
+            record.alcoholFlag = existing.alcoholFlag
+            if record.maxHR == nil { record.maxHR = existing.maxHR }
+            if record.sleepStart == nil { record.sleepStart = existing.sleepStart; record.sleepEnd = existing.sleepEnd }
+        }
+        try? await nightStore.upsert(record)
+    }
+
+    /// One-time import of the UserDefaults cache so existing installs have
+    /// their 30 days of stats immediately, before the HealthKit backfill lands.
+    private func importLegacyCacheIfNeeded() async {
+        let key = "nightStore.legacyImportDone"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
         let cal = Calendar.current
         let today = Date()
-        var totals: [String: (sum: Double, min: Double, max: Double, count: Int, values: [Double])] = [:]
+        for offset in 0..<60 {
+            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
+            if let existing = try? await nightStore.record(for: day), existing.score > 0 { continue }
+            let indicators = await localStore.loadIndicators(for: day)
+            guard !indicators.isEmpty else { continue }
+            let scores = await localStore.loadScores(from: day, to: day)
+            let daySummary = scores.first.map {
+                SleepScoreSummary(date: day, score: $0.score, trend: 0,
+                                  sleepScore: $0.sleepScore ?? 0, recoveryScore: $0.recoveryScore ?? 0,
+                                  confidence: 0, primarySource: .appleHealth)
+            } ?? scoreEngine.score(indicators: indicators, weights: .default)
+            await upsertNightRecord(indicators: indicators, summary: daySummary, date: day)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
 
+    /// Nights in the 30 days before `selectedDate` (exclusive), from the night store.
+    private func recentNights(days: Int, before date: Date) async -> [NightSummary] {
+        let cal = Calendar.current
+        guard let end = cal.date(byAdding: .day, value: -1, to: date),
+              let start = cal.date(byAdding: .day, value: -days, to: date) else { return [] }
+        return (try? await nightStore.records(from: start, to: end)) ?? []
+    }
+
+    private static func stats(from values: [Double]) -> MetricStats? {
+        guard let mn = values.min(), let mx = values.max(), !values.isEmpty else { return nil }
+        return MetricStats(
+            avg: values.reduce(0, +) / Double(values.count),
+            min: mn, max: mx, count: values.count, sortedValues: values.sorted()
+        )
+    }
+
+    private func loadMonthlyStats() async {
+        let nights = await recentNights(days: 30, before: Date())
+        var byName: [String: [Double]] = [:]
+        for n in nights {
+            for (name, value) in n.metrics { byName[name, default: []].append(value) }
+        }
+        let stats = byName.compactMapValues(Self.stats(from:))
+        if !stats.isEmpty || !nights.isEmpty { monthlyStats = stats }
+    }
+
+    private func loadActivityMonthlyStats() async {
+        let nights = await recentNights(days: 30, before: Date())
+        var totals: [String: [Double]] = [:]
         func collect(_ v: Double?, key: String) {
             guard let v, v > 0 else { return }
-            var e = totals[key] ?? (0, .infinity, -.infinity, 0, [])
-            e.sum += v; e.min = Swift.min(e.min, v); e.max = Swift.max(e.max, v)
-            e.count += 1; e.values.append(v)
-            totals[key] = e
+            totals[key, default: []].append(v)
         }
-
+        for n in nights {
+            collect(n.steps,           key: "steps")
+            collect(n.activeCalories,  key: "kcal")
+            collect(n.exerciseMinutes, key: "ex")
+            collect(n.peakHR,          key: "peakhr")
+            collect(n.vo2Max,          key: "vo2")
+        }
+        // Floors / stand time aren't on the night record; keep reading the day cache.
+        let cal = Calendar.current
         for offset in 1...30 {
-            guard let day = cal.date(byAdding: .day, value: -offset, to: today),
+            guard let day = cal.date(byAdding: .day, value: -offset, to: Date()),
                   let snap = await localStore.loadActivitySnapshot(for: day) else { continue }
-            collect(snap.steps,          key: "steps")
-            collect(snap.activeCalories, key: "kcal")
-            collect(snap.exerciseMinutes,key: "ex")
-            collect(snap.peakHR,         key: "peakhr")
-            collect(snap.floorsClimbed,  key: "floors")
-            collect(snap.standMinutes,   key: "stand")
-            collect(snap.vo2Max,         key: "vo2")
+            collect(snap.floorsClimbed, key: "floors")
+            collect(snap.standMinutes,  key: "stand")
         }
-
-        let newStats = totals.compactMapValues { t -> MetricStats? in
-            guard t.count > 0, t.min != .infinity else { return nil }
-            return MetricStats(avg: t.sum / Double(t.count), min: t.min, max: t.max, count: t.count, sortedValues: t.values.sorted())
-        }
+        let newStats = totals.compactMapValues(Self.stats(from:))
         // Only overwrite if we actually found data — preserves mock-seeded stats in DEBUG mode.
         if !newStats.isEmpty { activityMonthlyStats = newStats }
     }
 
+    /// Debt for the *selected* night: that night is age 0, plus the 13 before it.
+    /// Need comes from the best-rested fortnight in the last 90 nights.
     private func loadSleepDebt() async {
         let cal = Calendar.current
-        let today = Date()
-        var nights: [SleepDebtNight] = []
-        for offset in 1...SleepDebt.windowNights {
-            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let indicators = await localStore.loadIndicators(for: day)
-            guard let duration = indicators.first(where: { $0.name == "Sleep Duration" })?.value else { continue }
-            nights.append(SleepDebtNight(date: day, hours: duration))
+        let selected = cal.startOfDay(for: selectedDate)
+        guard let windowStart = cal.date(byAdding: .day, value: -(SleepDebt.windowNights - 1), to: selected),
+              let historyStart = cal.date(byAdding: .day, value: -90, to: selected) else { return }
+
+        var window = (try? await nightStore.records(from: windowStart, to: selected)) ?? []
+        // The selected night may not be persisted yet on first load; synthesise it.
+        if !window.contains(where: { cal.isDate($0.night, inSameDayAs: selected) }),
+           let hours = indicators.first(where: { $0.name == "Sleep Duration" })?.value, hours > 0 {
+            window.append(NightSummary.make(night: selected, indicators: indicators, summary: summary,
+                                            activity: nil))
         }
-        guard !nights.isEmpty else { return }
-        let need = SleepDebt.sleepNeed(from: monthlyStats["Sleep Duration"])
-        sleepDebt = SleepDebt.compute(nights: nights, need: need)
+        let nights = window.map(SleepDebtNight.init)
+        guard !nights.isEmpty else { sleepDebt = nil; return }
+
+        let history = ((try? await nightStore.records(from: historyStart, to: selected)) ?? []).map(SleepDebtNight.init)
+        let need = SleepDebt.baselineNeed(from: history)
+        let deepRem = history.compactMap(\.deepRemMinutes)
+        let baselineDeepRem = deepRem.isEmpty ? nil : deepRem.reduce(0, +) / Double(deepRem.count)
+        sleepDebt = SleepDebt.compute(nights: nights, need: need, baselineDeepRem: baselineDeepRem)
     }
 
     private func refreshTagInsights() async {
         var correlations: [TagCorrelation] = []
         if let tagStore, !tagStore.availableTags.isEmpty {
-            correlations = await tagInsightEngine.compute(tagStore: tagStore, localStore: localStore)
+            correlations = await tagInsightEngine.compute(tagStore: tagStore, nightStore: nightStore)
         }
         // Activity-level correlation (active vs rest days) — independent of user tags,
         // so it surfaces even before the user has tagged any nights.
-        let activityCorrelations = await tagInsightEngine.computeActivityCorrelations(localStore: localStore)
+        let activityCorrelations = await tagInsightEngine.computeActivityCorrelations(nightStore: nightStore)
         tagCorrelations = correlations + activityCorrelations
     }
 
     private func loadTrendHistory() async {
         let end   = Date().startOfDay
         let start = Calendar.current.date(byAdding: .day, value: -(trendRange.daySpan - 1), to: end) ?? end
-        scoreHistory = await localStore.loadScores(from: start, to: end)
+        let nights = (try? await nightStore.records(from: start, to: end)) ?? []
+        let fromStore = nights.filter { $0.score > 0 }.map {
+            SleepScoreTrendPoint(date: $0.night, score: $0.score, sleepScore: $0.sleepScore, recoveryScore: $0.recoveryScore)
+        }
+        scoreHistory = fromStore.isEmpty ? await localStore.loadScores(from: start, to: end) : fromStore
     }
 }

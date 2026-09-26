@@ -13,6 +13,11 @@ struct ScoreHeroView: View {
     var isLoading: Bool = false
     /// Sleep window for the selected night — shown as "11:32 PM — 7:45 AM".
     var sleepInterval: DateInterval? = nil
+    /// Alcohol heuristic for this night, when it fired.
+    var alcohol: AlcoholHeuristic.Result? = nil
+    /// User's answer to the alcohol prompt, if given.
+    var alcoholConfirmed: Bool? = nil
+    var onAlcoholTap: () -> Void = {}
     private let daySwipeThreshold: CGFloat = 56
 
     private var scoreInt: Int { Int(summary.score.rounded()) }
@@ -56,7 +61,13 @@ struct ScoreHeroView: View {
 
             // Score number
             scoreLabel
-                .padding(.bottom, 20)
+                .padding(.bottom, alcohol == nil ? 20 : 10)
+
+            if let alcohol, !isLoading {
+                AlcoholCalloutPill(result: alcohol, confirmed: alcoholConfirmed, onTap: onAlcoholTap)
+                    .padding(.bottom, 14)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
 
             // Doppler Stripe — full width hero
             DopplerStripeView(bins: bins, score: summary.score, height: 36)

@@ -400,5 +400,81 @@ enum MockSleepData {
             return SleepScoreTrendPoint(date: date, score: trio.0, sleepScore: trio.1, recoveryScore: trio.2)
         }
     }()
+
+    // MARK: - Night history (long-range store)
+
+    /// Deterministic, plausible history: weekends sleep later and worse, a slow
+    /// fitness trend (VO₂ up, sleeping HR down), and a few "drinks" nights with
+    /// HR +20 %. Newest night is yesterday.
+    static func nightSummaries(count: Int) -> [NightSummary] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        var rng = SeededRandom(seed: 42)
+        return (1...count).compactMap { offset -> NightSummary? in
+            guard let night = cal.date(byAdding: .day, value: -offset, to: today) else { return nil }
+            let weekend = DayType.classify(wakeDate: night) == .weekend
+            let fitness = Double(count - offset) / Double(count)          // 0 → 1 over history
+            let drinks = weekend && rng.next() < 0.45
+            let hours = (weekend ? 6.4 : 7.3) + rng.gaussian() * 0.6 + (drinks ? -0.5 : 0)
+            let hr = (58 - 5 * fitness) * (drinks ? 1.22 : 1.0) + rng.gaussian() * 2
+            let hrv = (42 + 12 * fitness) * (drinks ? 0.7 : 1.0) + rng.gaussian() * 6
+            let deep = Swift.max(20, (75 - (drinks ? 25 : 0)) + rng.gaussian() * 12)
+            let rem = Swift.max(30, (105 - (drinks ? 30 : 0)) + rng.gaussian() * 15)
+            let eff = Swift.min(98, Swift.max(70, 91 + rng.gaussian() * 4 - (drinks ? 5 : 0)))
+            let score = Swift.min(97, Swift.max(30,
+                42 + hours * 5 + (hrv - 40) * 0.4 - (hr - 55) * 0.8 + deep * 0.1 - (drinks ? 8 : 0) + rng.gaussian() * 4))
+            let steps = weekend ? 6000 + rng.gaussian() * 2500 : 9000 + rng.gaussian() * 3000
+            let exercise = Swift.max(0, (weekend ? 25 : 45) + rng.gaussian() * 25)
+            let bedtime = (weekend ? 11.5 : 10.8) + rng.gaussian() * 0.5
+            var s = NightSummary(
+                night: night,
+                score: score.rounded(),
+                sleepScore: Swift.min(99, score - 3 + rng.gaussian() * 3),
+                recoveryScore: Swift.min(99, score + 3 + rng.gaussian() * 3),
+                metrics: [
+                    "Sleep Duration": Swift.max(3.5, hours),
+                    "Sleep Efficiency": eff,
+                    "Sleep Latency": Swift.max(2, 15 + rng.gaussian() * 8),
+                    "REM Sleep": rem,
+                    "Deep Sleep": deep,
+                    "Core Sleep": Swift.max(60, hours * 60 - rem - deep),
+                    "Overnight Heart Rate": hr,
+                    "Lowest Overnight HR": hr - 8 + rng.gaussian(),
+                    "HRV": Swift.max(12, hrv),
+                    "Respiratory Rate": 14.2 + rng.gaussian() * 0.6,
+                    "Bedtime Consistency": bedtime,
+                    "REM Cycle Count": Double(Int(3 + rng.next() * 3)),
+                    "Long Awakenings": Double(Int(rng.next() * 2.4)),
+                ],
+                maxHR: hr + 14 + rng.gaussian() * 3,
+                steps: Swift.max(500, steps),
+                activeCalories: Swift.max(100, 420 + rng.gaussian() * 150),
+                exerciseMinutes: exercise,
+                peakHR: 120 + exercise * 0.8 + rng.gaussian() * 8,
+                vo2Max: 42 + 5 * fitness + rng.gaussian() * 0.4,
+                sleepStart: cal.date(byAdding: .hour, value: -Int(24 - bedtime + 12), to: night),
+                sleepEnd: cal.date(byAdding: .hour, value: 7, to: night),
+                dayType: weekend ? .weekend : .weekday,
+                alcoholFlag: nil
+            )
+            s.metrics["Sleep Stress"] = Swift.max(0, Swift.min(100, 30 + (hr - 55) * 3 - (hrv - 40)))
+            return s
+        }
+    }
+}
+
+/// Tiny deterministic PRNG so mock history is stable between launches.
+struct SeededRandom {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed &* 6364136223846793005 &+ 1442695040888963407 }
+    mutating func next() -> Double {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return Double(state >> 11) / Double(1 << 53)
+    }
+    /// Approximate standard normal (Box–Muller).
+    mutating func gaussian() -> Double {
+        let u1 = Swift.max(next(), 1e-9), u2 = next()
+        return (-2 * log(u1)).squareRoot() * cos(2 * .pi * u2)
+    }
 }
 #endif

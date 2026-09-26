@@ -2,20 +2,13 @@ import Foundation
 
 @MainActor
 final class TagInsightEngine {
-    func compute(tagStore: SleepTagStore, localStore: SleepLocalStore) async -> [TagCorrelation] {
-        let cal = Calendar.current
-        let today = Date()
-
-        // Collect up to 60 days of data
+    func compute(tagStore: SleepTagStore, nightStore: NightRecordStore) async -> [TagCorrelation] {
+        // Up to 90 nights of history from the night store.
+        let nights = (try? await nightStore.latest(90)) ?? []
         var rows: [(indicators: [SleepIndicator], score: Double, tags: [SleepTag])] = []
-        for offset in 0..<60 {
-            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let indicators = await localStore.loadIndicators(for: day)
-            guard !indicators.isEmpty else { continue }
-            let scores = await localStore.loadScores(from: day, to: day)
-            let score = scores.first?.score ?? 0
-            let tags = tagStore.activeTags(for: day)
-            rows.append((indicators, score, tags))
+        for n in nights where n.score > 0 {
+            let indicators = n.metrics.map { SleepIndicator(name: $0.key, detail: "", value: $0.value, unit: Self.unit(for: $0.key), category: .recovery, source: .appleHealth) }
+            rows.append((indicators, n.score, tagStore.activeTags(for: n.night)))
         }
 
         guard rows.count >= 4 else { return [] }
@@ -90,25 +83,18 @@ final class TagInsightEngine {
     /// bucketed by activity level rather than user-applied tags.
     ///
     /// Currently buckets on `steps`. Returns at most one correlation per metric.
-    func computeActivityCorrelations(localStore: SleepLocalStore) async -> [TagCorrelation] {
-        let cal = Calendar.current
-        let today = Date()
-
+    func computeActivityCorrelations(nightStore: NightRecordStore) async -> [TagCorrelation] {
         struct Row {
             let score: Double
             let steps: Double?
             let indicators: [SleepIndicator]
         }
 
+        let nights = (try? await nightStore.latest(90)) ?? []
         var rows: [Row] = []
-        for offset in 1...60 {
-            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let indicators = await localStore.loadIndicators(for: day)
-            guard !indicators.isEmpty else { continue }
-            let scores = await localStore.loadScores(from: day, to: day)
-            let score = scores.first?.score ?? 0
-            let activity = await localStore.loadActivitySnapshot(for: day)
-            rows.append(Row(score: score, steps: activity?.steps, indicators: indicators))
+        for n in nights where n.score > 0 {
+            let indicators = n.metrics.map { SleepIndicator(name: $0.key, detail: "", value: $0.value, unit: Self.unit(for: $0.key), category: .recovery, source: .appleHealth) }
+            rows.append(Row(score: n.score, steps: n.steps, indicators: indicators))
         }
 
         let withSteps = rows.compactMap { row -> (Double, Row)? in
@@ -161,5 +147,25 @@ final class TagInsightEngine {
             avgScoreBaseline: avgLow,
             metricImpacts: sortedImpacts
         )]
+    }
+
+    /// Display unit for a metric name. Night records store only values, so the
+    /// unit is recovered from the metric registry's known names.
+    static func unit(for name: String) -> String {
+        switch name {
+        case "Sleep Duration":                              return "hr"
+        case "Sleep Efficiency", "Blood Oxygen":            return "%"
+        case "REM Sleep", "Deep Sleep", "Core Sleep",
+             "Sleep Latency", "Exercise Time", "Stand Time",
+             "Workout Duration":                            return "min"
+        case "Overnight Heart Rate", "Lowest Overnight HR": return "bpm"
+        case "HRV", "Peak HRV":                             return "ms"
+        case "Respiratory Rate":                            return "br/min"
+        case "Wrist Temperature":                           return "°C"
+        case "Active Energy", "Basal Energy", "Workout Energy": return "kcal"
+        case "Steps":                                       return "steps"
+        case "REM Cycle Count":                             return "cycles"
+        default:                                            return ""
+        }
     }
 }

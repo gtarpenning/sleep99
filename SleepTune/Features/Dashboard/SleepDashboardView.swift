@@ -13,6 +13,7 @@ struct SleepDashboardView: View {
     @Bindable var viewModel: DashboardViewModel
     @Environment(AppContainer.self) private var container
     @Environment(\.openURL) private var openURL
+    @State private var showsAlcoholSheet = false
 
     var body: some View {
         NavigationStack {
@@ -68,7 +69,10 @@ struct SleepDashboardView: View {
                     onPreviousDay: { shiftDate(by: -1) },
                     onNextDay: { shiftDate(by: 1) },
                     isLoading: viewModel.isSyncing && viewModel.summary.score == 0,
-                    sleepInterval: viewModel.sleepInterval
+                    sleepInterval: viewModel.sleepInterval,
+                    alcohol: viewModel.alcoholResult,
+                    alcoholConfirmed: viewModel.alcoholConfirmed,
+                    onAlcoholTap: { showsAlcoholSheet = true }
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -138,6 +142,16 @@ struct SleepDashboardView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .sheet(isPresented: $showsAlcoholSheet) {
+            if let result = viewModel.alcoholResult {
+                AlcoholDetailSheet(
+                    result: result,
+                    date: viewModel.selectedDate,
+                    confirmed: viewModel.alcoholConfirmed,
+                    onConfirm: { viewModel.confirmAlcohol($0) }
+                )
+            }
+        }
     }
 
     /// Last night's mean HR minus the user's 30-day personal baseline, in bpm.
