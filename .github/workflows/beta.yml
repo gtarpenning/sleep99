@@ -45,12 +45,13 @@ jobs:
           gem install bundler --no-document 2>/dev/null || true
           bundle install --jobs 4 --retry 3
 
-      - name: Unlock keychain
+      - name: Keychain search list
+        # Self-hosted runner: the dist cert + key live in the login keychain.
+        # Never replace the default keychain here; that drops login from the
+        # search list and codesign can no longer find the private key.
         run: |
-          security create-keychain -p "" build.keychain 2>/dev/null || true
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
+          security list-keychains -d user -s ~/Library/Keychains/login.keychain-db
+          security default-keychain -s ~/Library/Keychains/login.keychain-db
 
       - name: Configure git credentials
         run: |
